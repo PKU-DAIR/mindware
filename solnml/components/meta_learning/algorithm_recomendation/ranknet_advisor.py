@@ -2,12 +2,16 @@ import os
 import numpy as np
 import pickle as pk
 from keras import backend as K
+import tensorflow as tf
 from keras.models import Model, load_model
 from keras.layers import Activation, Dense, Input, Subtract
 from keras.layers import BatchNormalization
 from keras.optimizers import SGD
 from solnml.utils.logging_utils import get_logger
 from solnml.components.meta_learning.algorithm_recomendation.base_advisor import BaseAdvisor
+
+tf.config.threading.set_intra_op_parallelism_threads(4)
+tf.config.threading.set_inter_op_parallelism_threads(4)
 
 
 class RankNetAdvisor(BaseAdvisor):
