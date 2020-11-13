@@ -106,7 +106,7 @@ class AutoML(object):
                 n_algo_recommended = 5
                 meta_datasets = kwargs.get('meta_datasets', None)
                 self.logger.info('Executing Meta-Learning based Algorithm Recommendation.')
-                alad = RankNetAdvisor(task_type=self.task_type, n_algorithm=3,
+                alad = RankNetAdvisor(task_type=self.task_type, n_algorithm=n_algo_recommended,
                                       metric=self.metric_id)
                 alad.fit()
                 model_candidates = alad.fetch_algorithm_set(dataset_id)
