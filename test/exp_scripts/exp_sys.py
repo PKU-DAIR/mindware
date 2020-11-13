@@ -52,7 +52,11 @@ def evaluate_sys(run_id, task_type, mth, dataset, ens_method, enable_meta,
                                enable_meta_algorithm_selection=enable_meta,
                                evaluation=eval_type,
                                metric='bal_acc',
-                               # include_algorithms=['extra_trees', 'random_forest'],
+                               include_algorithms=['extra_trees', 'random_forest',
+                                                   'adaboost', 'gradient_boosting',
+                                                   'k_nearest_neighbors', 'liblinear_svc',
+                                                   'libsvm_svc', 'lightgbm',
+                                                   'logistic_regression', 'random_forest'],
                                n_jobs=1)
     else:
         from solnml.estimators import Regressor
