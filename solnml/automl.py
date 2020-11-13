@@ -9,7 +9,7 @@ from solnml.components.feature_engineering.transformation_graph import DataNode
 from solnml.components.models.regression import _regressors
 from solnml.components.models.classification import _classifiers
 from solnml.components.models.imbalanced_classification import _imb_classifiers
-from solnml.components.meta_learning.algorithm_recomendation.ranknet_advisor import RankNetAdvisor
+from solnml.components.meta_learning.algorithm_recomendation.ranknet_advisor_torch import RankNetAdvisor
 from solnml.bandits.first_layer_bandit import FirstLayerBandit
 
 classification_algorithms = _classifiers.keys()
