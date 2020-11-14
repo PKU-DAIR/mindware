@@ -42,14 +42,14 @@ def evaluate_sys(run_id, task_type, mth, dataset, ens_method, enable_meta,
                  eval_type='holdout', time_limit=1200, seed=1):
     _task_type = MULTICLASS_CLS if task_type == 'cls' else REGRESSION
     train_data, test_data = load_train_test_data(dataset, task_type=_task_type)
-    enable_meta = True if enable_meta == 'true' else False
+    _enable_meta = True if enable_meta == 'true' else False
     if task_type == 'cls':
         from solnml.estimators import Classifier
         estimator = Classifier(time_limit=time_limit,
                                per_run_time_limit=300,
                                output_dir=save_folder,
                                ensemble_method=ens_method,
-                               enable_meta_algorithm_selection=enable_meta,
+                               enable_meta_algorithm_selection=_enable_meta,
                                evaluation=eval_type,
                                metric='bal_acc',
                                include_algorithms=['extra_trees', 'random_forest',
@@ -64,7 +64,7 @@ def evaluate_sys(run_id, task_type, mth, dataset, ens_method, enable_meta,
                               per_run_time_limit=300,
                               output_dir=save_folder,
                               ensemble_method=ens_method,
-                              enable_meta_algorithm_selection=enable_meta,
+                              enable_meta_algorithm_selection=_enable_meta,
                               evaluation=eval_type,
                               metric='mse',
                               # include_preprocessors=['percentile_selector_regression'],
@@ -254,10 +254,12 @@ if __name__ == "__main__":
                     if mth == 'ausk' and task_type == 'rgs':
                         test_acc = data[2]
                         val_acc = min([ele - 2 for ele in data[4] if ele != 2])
-                    elif task_type == 'rgs':
+                    elif mth == 'ausk':
                         val_acc, test_acc = -data[1], data[2]
+                    elif task_type == 'rgs':
+                        val_acc, test_acc = -data[1], data[2][-1]
                     else:
-                        val_acc, test_acc = data[1], data[2]
+                        val_acc, test_acc = data[1], data[2][-1]
                     results.append([val_acc, test_acc])
                 print(mth, results)
                 if len(results) == rep:
