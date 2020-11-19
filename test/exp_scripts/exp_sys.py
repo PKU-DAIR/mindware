@@ -236,7 +236,7 @@ if __name__ == "__main__":
         # method_ids = ['fixed', 'alter_hpo', 'rb', 'ausk']
         method_ids = mode.split(',')[1:]
         if len(method_ids) == 0:
-            method_ids = ['alter_hpo', 'combined', 'ausk']
+            method_ids = ['alter_hpo', 'combined', 'ausk', 'tpot']
         for mth in method_ids:
             headers.extend(['val-%s' % mth, 'test-%s' % mth])
         tbl_data = list()
@@ -245,8 +245,12 @@ if __name__ == "__main__":
             for mth in method_ids:
                 results = list()
                 for run_id in range(rep):
+                    if mth == 'tpot':
+                        _ens_method = None
+                    else:
+                        _ens_method = ens_method
                     file_path = save_folder + '%s_%s_%s_%s_%d_%d_%d.pkl' % (
-                        task_type, mth, dataset, enable_meta, time_cost, (ens_method is None), run_id)
+                        task_type, mth, dataset, enable_meta, time_cost, (_ens_method is None), run_id)
                     if not os.path.exists(file_path):
                         continue
                     with open(file_path, 'rb') as f:
@@ -256,6 +260,8 @@ if __name__ == "__main__":
                         val_acc = min([ele - 2 for ele in data[4] if ele != 2])
                     elif mth == 'ausk':
                         val_acc, test_acc = -data[1], data[2]
+                    elif mth == 'tpot':
+                        val_acc, test_acc = data[1], data[2]
                     elif task_type == 'rgs':
                         val_acc, test_acc = -data[1], data[2][-1]
                     else:
