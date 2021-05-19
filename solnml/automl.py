@@ -169,8 +169,7 @@ class AutoML(object):
                 self.solver.iterate()
         self.eval_time = time.time() - self.timestamp
 
-        if self.ensemble_method is not None and self.evaluation_type in ['holdout', 'partial']:
-            self.solver.fit_ensemble()
+        self.solver.fit_ensemble()
         self.total_time = time.time() - self.global_start_time
 
     def refit(self):

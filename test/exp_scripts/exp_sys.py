@@ -28,7 +28,7 @@ parser.add_argument('--mode', type=str, default='alter_hpo')
 parser.add_argument('--cv', type=str, choices=['cv', 'holdout', 'partial'], default='holdout')
 parser.add_argument('--ens', type=str, default='None')
 parser.add_argument('--enable_meta', type=str, default='false', choices=['true', 'false'])
-parser.add_argument('--tree_id', type=int, default=0)
+parser.add_argument('--tree_id', type=int, default=1)
 parser.add_argument('--time_cost', type=int, default=600)
 parser.add_argument('--start_id', type=int, default=0)
 parser.add_argument('--rep_num', type=int, default=5)
@@ -75,20 +75,20 @@ def evaluate_sys(run_id, task_type, mth, dataset, ens_method, enable_meta,
     start_time = time.time()
     estimator.fit(train_data, opt_strategy=mth, dataset_id=dataset, tree_id=tree_id)
     pred = estimator.predict(test_data)
-    if task_type == 'cls':
-        test_score = balanced_accuracy_score(test_data.data[1], pred)
-    else:
-        test_score = mean_squared_error(test_data.data[1], pred)
+    test_score = {}
+    for key in pred:
+        test_score[key] = balanced_accuracy_score(test_data.data[1], pred[key])
     validation_score = estimator._ml_engine.solver.incumbent_perf
     # eval_dict = estimator._ml_engine.solver.get_eval_dict()
     print('Run ID         : %d' % run_id)
     print('Dataset        : %s' % dataset)
-    print('Val/Test score : %f - %f' % (validation_score, test_score))
+    # print('Val/Test score : %f - %f' % (validation_score, test_score))
 
     save_path = save_folder + '%s_%s_%s_%s_%d_%d_%d_%d.pkl' % (
         task_type, mth, dataset, enable_meta, time_limit, (ens_method is None), tree_id, run_id)
     with open(save_path, 'wb') as f:
-        pickle.dump([dataset, validation_score, test_score, start_time], f)
+        pickle.dump([dataset, validation_score, test_score, start_time, estimator._ml_engine.solver.eval_dict.copy()],
+                    f)
 
     # Delete output dir
     shutil.rmtree(os.path.join(estimator.get_output_dir()))
@@ -173,19 +173,20 @@ def evaluate_ausk(run_id, task_type, mth, dataset, ens_method, enable_meta,
     str_stats = automl.sprint_statistics()
     result_score = automl.cv_results_['mean_test_score']
     result_time = automl.cv_results_['mean_fit_time']
+    configs = automl.cv_results_['params']
 
     print('=' * 10)
     # print(model_desc)
-    print(str_stats)
+    # print(str_stats)
     print('=' * 10)
 
     print('Validation score', validation_score)
     print('Test score', test_score)
-    # print(automl.show_models())
+    print(configs)
     save_path = save_folder + '%s_%s_%s_%s_%d_%d_%d.pkl' % (
         task_type, mth, dataset, enable_meta, time_limit, (ens_method is None), run_id)
     with open(save_path, 'wb') as f:
-        pickle.dump([dataset, validation_score, test_score, start_time, result_score, result_time], f)
+        pickle.dump([dataset, validation_score, test_score, start_time, configs, result_score], f)
 
     shutil.rmtree(output_dir)
     shutil.rmtree(os.path.join(tmp_dir, '.auto-sklearn'))

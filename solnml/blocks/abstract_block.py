@@ -121,51 +121,54 @@ class AbstractBlock(object):
                 pkl.dump([op_list, estimator, None], f)
 
     def fit_ensemble(self):
-        if self.ensemble_method is not None:
-            config_path = os.path.join(self.output_dir, '%s_topk_config.pkl' % self.timestamp)
-            with open(config_path, 'rb') as f:
-                stats = pkl.load(f)
+        config_path = os.path.join(self.output_dir, '%s_topk_config.pkl' % self.timestamp)
+        with open(config_path, 'rb') as f:
+            stats = pkl.load(f)
 
-            # Ensembling all intermediate/ultimate models found in above optimization process.
-            self.es = EnsembleBuilder(stats=stats,
-                                      data_node=self.original_data,
-                                      ensemble_method=self.ensemble_method,
-                                      ensemble_size=self.ensemble_size,
-                                      task_type=self.task_type,
-                                      metric=self.metric,
-                                      output_dir=self.output_dir)
-            self.es.fit(data=self.original_data)
+        # Ensembling all intermediate/ultimate models found in above optimization process.
+        self.es = {}
+        for ens_method in ['bagging', 'blending', 'stacking', 'ensemble_selection']:
+            if ens_method == 'ensemble_selection':
+                ensemble_size = 50
+            else:
+                ensemble_size = 8
+            self.es[ens_method] = EnsembleBuilder(stats=stats,
+                                                  data_node=self.original_data,
+                                                  ensemble_method=ens_method,
+                                                  ensemble_size=ensemble_size,
+                                                  task_type=self.task_type,
+                                                  metric=self.metric,
+                                                  output_dir=self.output_dir)
+            self.es[ens_method].fit(data=self.original_data)
 
     def predict(self, test_data: DataNode):
         if self.task_type in CLS_TASKS:
             pred = self._predict(test_data)
-            return np.argmax(pred, axis=-1)
+            for key in pred:
+                pred[key] = np.argmax(pred[key], axis=-1)
+            return pred
         else:
             return self._predict(test_data)
 
     def _predict(self, test_data: DataNode):
-        if self.ensemble_method is not None:
-            if self.es is None and self.eval_type == 'cv':
+        prediction = {}
+        for ens_method in ['bagging', 'blending', 'stacking', 'ensemble_selection']:
+            prediction[ens_method] = self.es[ens_method].predict(test_data)
+        try:
+            best_op_list, estimator = load_combined_transformer_estimator(self.output_dir, self.incumbent,
+                                                                          self.timestamp)
+        except Exception as e:
+            if self.eval_type == 'cv':
                 raise AttributeError("Please call refit() for cross-validation!")
-            elif self.es is None:
-                raise AttributeError("AutoML is not fitted!")
-            return self.es.predict(test_data)
-        else:
-            try:
-                best_op_list, estimator = load_combined_transformer_estimator(self.output_dir, self.incumbent,
-                                                                              self.timestamp)
-            except Exception as e:
-                if self.eval_type == 'cv':
-                    raise AttributeError("Please call refit() for cross-validation!")
-                else:
-                    raise e
-            test_data_node = test_data.copy_()
-            test_data_node = construct_node(test_data_node, best_op_list)
-
-            if self.task_type in CLS_TASKS:
-                return estimator.predict_proba(test_data_node.data[0])
             else:
-                return estimator.predict(test_data_node.data[0])
+                raise e
+        test_data_node = test_data.copy_()
+        test_data_node = construct_node(test_data_node, best_op_list)
+        if self.task_type in CLS_TASKS:
+            prediction['single'] = estimator.predict_proba(test_data_node.data[0])
+        else:
+            prediction['single'] = estimator.predict(test_data_node.data[0])
+        return prediction
 
     def predict_proba(self, test_data: DataNode):
         if self.task_type not in CLS_TASKS:
