@@ -829,9 +829,9 @@ class Landmark1NN(MetaFeature):
         import sklearn.neighbors
 
         if len(y.shape) == 1 or y.shape[1] == 1:
-            kf = sklearn.model_selection.StratifiedKFold(n_splits=5, random_state=1)
+            kf = sklearn.model_selection.StratifiedKFold(n_splits=5)
         else:
-            kf = sklearn.model_selection.KFold(n_splits=5, random_state=1)
+            kf = sklearn.model_selection.KFold(n_splits=5)
 
         accuracy = 0.
         for train, test in kf.split(X, y):

@@ -145,7 +145,7 @@ class EvaluationWorker(BaseWorker):
 
             model_path = CombinedTopKModelSaver.get_path_by_config(output_dir=self.evaluator.output_dir,
                                                                    config=config,
-                                                                   identifier=self.evaluator.timestamp)
+                                                                   identifier=self.evaluator.datetime)
 
             with open(model_path, 'rb') as f:
                 op_list, model, _ = pkl.load(f)
@@ -182,7 +182,7 @@ class EvaluationWorker(BaseWorker):
 
             model_path = CombinedTopKModelSaver.get_path_by_config(output_dir=self.evaluator.output_dir,
                                                                    config=config,
-                                                                   identifier=self.evaluator.timestamp)
+                                                                   identifier=self.evaluator.datetime)
 
             with open(model_path, 'rb') as f:
                 op_list, model, _ = pkl.load(f)

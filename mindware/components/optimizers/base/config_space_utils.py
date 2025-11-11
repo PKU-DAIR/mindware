@@ -5,7 +5,7 @@ from typing import List
 from ConfigSpace import Configuration, ConfigurationSpace
 from ConfigSpace.hyperparameters import CategoricalHyperparameter, \
     IntegerHyperparameter, FloatHyperparameter
-
+from mindware.utils.logging_utils import get_logger
 
 def convert_configurations_to_array(configs: List[Configuration]) -> np.ndarray:
     """Impute inactive hyperparameters in configurations with their default.
@@ -166,14 +166,22 @@ def get_random_neighborhood(configuration: Configuration, num: int, seed: int) -
 
 
 # TODO: escape the bug.
-def sample_configurations(configuration_space: ConfigurationSpace, num: int) -> List[Configuration]:
+def sample_configurations(configuration_space: ConfigurationSpace, num: int, logger=None) -> List[Configuration]:
     result = []
     cnt = 0
     while cnt < num:
+        i = 0
         config = configuration_space.sample_configuration(1)
-        if config not in result:
-            result.append(config)
-            cnt += 1
+        while config in result:
+            config = configuration_space.sample_configuration(1)
+            i += 1
+            if i > 1000:
+                if logger is not None:
+                    logger.warning('Func sample_configurations(): Cannot sample a new random configuration after 1000 iters.')
+                break
+
+        result.append(config)
+        cnt += 1
     return result
 
 

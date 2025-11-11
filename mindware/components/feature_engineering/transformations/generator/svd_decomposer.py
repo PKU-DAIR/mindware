@@ -37,7 +37,7 @@ class SvdDecomposer(Transformer):
         return X_new
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         target_dim = UniformIntegerHyperparameter(
             "target_dim", 10, 256, default_value=128)
         cs = ConfigurationSpace()

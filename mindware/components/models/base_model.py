@@ -18,6 +18,12 @@ class BaseModel(object):
             The configuration space of this classification algorithm.
         """
         raise NotImplementedError()
+    
+    def get_data_info(self, feature_map):
+        """
+        Get the data's information, inclued feature_types ,ie.
+        """
+        self.feature_map = feature_map
 
     def fit(self, X, y):
         """
@@ -55,6 +61,7 @@ class BaseClassificationModel(BaseModel):
     def __init__(self):
         self.estimator = None
         self.properties = None
+        self._estimator_type = "classifier"  # 兼容scikit-learn
 
     def predict(self, X):
         """
@@ -85,6 +92,7 @@ class BaseRegressionModel(BaseModel):
     def __init__(self):
         self.estimator = None
         self.properties = None
+        self._estimator_type = "regressor"  # 兼容scikit-learn
 
     def predict(self, X):
         """
@@ -105,6 +113,10 @@ class BaseRegressionModel(BaseModel):
 
 class IterativeComponentWithSampleWeight(BaseModel):
     def fit(self, X, y, sample_weight=None):
+        if hasattr(self, '_estimator_type') and self._estimator_type == 'classifier':
+            from sklearn.utils.multiclass import unique_labels
+            self.classes_ = unique_labels(y)
+
         self.iterative_fit(
             X, y, n_iter=2, refit=True, sample_weight=sample_weight
         )
@@ -114,6 +126,12 @@ class IterativeComponentWithSampleWeight(BaseModel):
             self.iterative_fit(X, y, n_iter=n_iter, sample_weight=sample_weight)
             iteration += 1
         return self
+
+    def configuration_fully_fitted(self):
+        raise NotImplementedError()
+
+    def iterative_fit(self, X, y, n_iter=1, refit=False, sample_weight=None):
+        raise NotImplementedError()
 
     @staticmethod
     def get_max_iter():
@@ -133,14 +151,25 @@ class IterativeComponentWithSampleWeight(BaseModel):
 
 
 class IterativeComponent(BaseModel):
-    def fit(self, X, y, sample_weight=None):
-        self.iterative_fit(X, y, n_iter=2, refit=True)
+    def fit(self, X, Y, sample_weight=None):
+
+        if hasattr(self, '_estimator_type') and self._estimator_type == 'classifier':
+            from sklearn.utils.multiclass import unique_labels
+            self.classes_ = unique_labels(Y)
+
+        self.iterative_fit(X, Y, n_iter=2, refit=True)
         iteration = 2
         while not self.configuration_fully_fitted():
             n_iter = int(2 ** iteration / 2)
-            self.iterative_fit(X, y, n_iter=n_iter, refit=False)
+            self.iterative_fit(X, Y, n_iter=n_iter, refit=False)
             iteration += 1
         return self
+
+    def configuration_fully_fitted(self):
+        raise NotImplementedError()
+
+    def iterative_fit(self, X, Y, n_iter=1, refit=False, sample_weight=None):
+        raise NotImplementedError()
 
     @staticmethod
     def get_max_iter():

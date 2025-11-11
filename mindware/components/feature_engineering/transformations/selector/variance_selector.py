@@ -16,6 +16,8 @@ class VarianceSelector(Transformer):
 
         feature_types = input_datanode.feature_types
         X, y = input_datanode.data
+        origin_feature_map = input_datanode.feature_map
+
         if target_fields is None:
             target_fields = collect_fields(feature_types, self.input_type)
             X_new = X.copy()
@@ -38,7 +40,10 @@ class VarianceSelector(Transformer):
         irrevalent_types = [feature_types[idx] for idx in irrevalent_fields]
         selected_types = [feature_types[idx] for idx in target_fields if is_selected[idx]]
         selected_types.extend(irrevalent_types)
-
+        
+        new_feature_map = [origin_feature_map[idx] for idx in irrevalent_fields] 
+        new_feature_map += [origin_feature_map[idx] for idx in target_fields if is_selected[idx]]
+        
         _X = self.model.transform(X_new)
 
         if len(irrevalent_fields) > 0:
@@ -55,7 +60,7 @@ class VarianceSelector(Transformer):
             else:
                 feature_names = None
         new_feature_types = selected_types
-        output_datanode = DataNode((new_X, y), new_feature_types, input_datanode.task_type, feature_names=feature_names)
+        output_datanode = DataNode((new_X, y), new_feature_types,input_datanode.task_type,feature_map=new_feature_map, feature_names=feature_names)
         output_datanode.trans_hist = input_datanode.trans_hist.copy()
         output_datanode.trans_hist.append(self.type)
         output_datanode.enable_balance = input_datanode.enable_balance
@@ -65,7 +70,7 @@ class VarianceSelector(Transformer):
         return output_datanode
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         if optimizer == 'smac':
             cs = ConfigurationSpace()
             return cs

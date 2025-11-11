@@ -13,6 +13,7 @@ from mindware.components.models.base_model import BaseRegressionModel
 class LibSVM_SVR(BaseRegressionModel):
     def __init__(self, epsilon, C, kernel, gamma, shrinking, tol, max_iter,
                  degree=3, coef0=0, random_state=None):
+        BaseRegressionModel.__init__(self)
         self.epsilon = epsilon
         self.C = C
         self.kernel = kernel
@@ -53,7 +54,7 @@ class LibSVM_SVR(BaseRegressionModel):
         else:
             self.coef0 = float(self.coef0)
         self.tol = float(self.tol)
-        self.max_iter = float(self.max_iter)
+        self.max_iter = int(self.max_iter)
 
         self.shrinking = check_for_bool(self.shrinking)
 
@@ -87,7 +88,7 @@ class LibSVM_SVR(BaseRegressionModel):
                 'output': (PREDICTIONS,)}
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         if optimizer == 'smac':
             epsilon = CategoricalHyperparameter("epsilon", [1e-4, 1e-3, 1e-2, 1e-1, 1], default_value=1e-4)
             C = UniformFloatHyperparameter("C", 0.03125, 32768, log=True,

@@ -39,7 +39,7 @@ class PcaDecomposer(Transformer):
         return X_new
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         keep_variance = UniformFloatHyperparameter(
             "keep_variance", 0.5, 0.9999, default_value=0.9999)
         whiten = CategoricalHyperparameter(

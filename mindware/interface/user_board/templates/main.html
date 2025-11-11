@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Mindware</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="all,follow">
+    <link rel="stylesheet" href="/static/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/vendor/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/static/css/style.default.css" id="theme-stylesheet">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        /* 设置目录栏的宽度和背景色 */
+        .sidebar {
+            height: 100%;
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+
+        @font-face {
+          font-family: 'Courgette';
+          src: url("/static/vendor/google-fonts/Courgette-Regular.ttf") format('truetype');
+        }
+
+        /* 设置目录栏中链接的样式 */
+        .sidebar h2 {
+            font-family: 'Courgette', cursive; /* 使用 Pacifico 字体 */
+            font-weight: bold;
+            padding: 10px;
+            text-decoration: none;
+            text-align: center; /* 让链接文本居中 */
+            font-size: 45px; /* 设置字体大小 */
+            color: #333; /* 设置字体颜色 */
+        }
+        .sidebar a {
+            font-weight: bold;
+            display: block;
+            padding: 10px;
+            text-decoration: none;
+            text-align: center; /* 让链接文本居中 */
+            font-size: 30px; /* 设置字体大小 */
+            color: #333; /* 设置字体颜色 */
+        }
+
+        /* 设置目录栏中链接的 hover 效果 */
+        .sidebar a:hover {
+            background-color: #ddd;
+        }
+
+        /* 设置内容区域的左边距，使其腾出目录栏的宽度 */
+        .content {
+            margin-left: 250px;
+            padding: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 弹窗模态框 -->
+    <div class="modal" id="myModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <!-- 模态框头部 -->
+                <div class="modal-header">
+                    <h4 class="modal-title">提示</h4>
+                    <button type="button" class="btn-close" onclick="$('#myModal').modal('hide');"></button>
+                </div>
+                <!-- 模态框主体 -->
+                <div class="modal-body">
+                    <p id="message"></p>
+                </div>
+                <!-- 模态框底部 -->
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="$('#myModal').modal('hide');">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 左侧目录栏 -->
+    <div class="sidebar">
+        <h2>Mindware</h2>
+        <ul class="list-unstyled">
+            <li><a href="/user_board/history">History</a></li>
+            <li><a href="/user_board/new_task">New Task</a></li>
+        </ul>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="content">
+        <h1>带侧边目录栏的页面布局</h1>
+        <div id="section1">
+            <h2>Section 1</h2>
+            <p>这是第一部分的内容。</p>
+        </div>
+        <div id="section2">
+            <h2>Section 2</h2>
+            <p>这是第二部分的内容。</p>
+        </div>
+        <div id="section3">
+            <h2>Section 3</h2>
+            <p>这是第三部分的内容。</p>
+        </div>
+        <div>
+            <button id="login" class="btn btn-primary" onclick="test_db()"><i class="fa fa-user-md"></i>Login</button>
+        </div>
+    </div>
+
+<script src="/static/vendor/jquery/jquery.js"></script>
+<script src="/static/vendor/jquery/jquery.md5.js"></script>
+<script src="/static/vendor/jquery.cookie/jquery.cookie.js"></script>
+<script src="/static/vendor/bootstrap/js/bootstrap.min.js"></script>
+<script src="/static/js/common.js"></script>
+
+    <!-- 你的其他 JavaScript 代码 -->
+    <script>
+    function test_db() {
+
+        $.ajax({
+            url: "/user_board/test_db/",
+            type: "Get",
+            success: function (data) {
+                if (data.status_code == 200) {
+                    // 请求成功，显示成功弹窗
+                    $('#message').text('请求成功！');
+                    $('#myModal').modal('show');
+                } else {
+                    // 请求失败，显示失败弹窗
+                    $('#message').text('请求失败：资源未找到！');
+                    $('#myModal').modal('show');
+                }
+            },
+            error: function () {
+                alert('Network Error');
+            }
+        });
+    }
+    </script>
+
+</body>
+
+</html>

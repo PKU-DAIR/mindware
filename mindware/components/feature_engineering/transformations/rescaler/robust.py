@@ -30,7 +30,7 @@ class RobustScaler(Transformer):
         return _X
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         cs = ConfigurationSpace()
         q_min = UniformFloatHyperparameter(
             'q_min', 0.001, 0.3, default_value=0.25

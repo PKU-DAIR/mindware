@@ -3,20 +3,20 @@ import hashlib
 import numpy as np
 import pickle as pkl
 from collections import OrderedDict
-from mindware.datasets.utils import calculate_metafeatures
 from mindware.utils.logging_utils import get_logger
 from mindware.components.utils.constants import CLS_TASKS, RGS_TASKS
 from mindware.components.meta_learning.algorithm_recomendation.metadata_manager import MetaDataManager
 from mindware.components.meta_learning.algorithm_recomendation.metadata_manager import get_feature_vector
 
 _cls_builtin_algorithms = ['lightgbm', 'random_forest', 'libsvm_svc', 'extra_trees', 'liblinear_svc',
-                           'k_nearest_neighbors', 'adaboost', 'lda', 'qda']
+                           'k_nearest_neighbors', 'adaboost', 'lda', 'qda', 'gradient_boosting', 'logistic_regression', 'xgboost']
+
 _rgs_builtin_algorithms = ['lightgbm', 'random_forest', 'libsvm_svr', 'extra_trees', 'liblinear_svr',
-                           'k_nearest_neighbors', 'adaboost', 'lasso_regression', 'gradient_boosting']
+                           'k_nearest_neighbors', 'adaboost', 'lasso_regression', 'gradient_boosting', 'ridge_regression', 'xgboost']
 
 
 class BaseAdvisor(object):
-    def __init__(self, n_algorithm=3,
+    def __init__(self, 
                  task_type=None,
                  metric='bal_acc',
                  rep=3,
@@ -25,26 +25,25 @@ class BaseAdvisor(object):
                  exclude_datasets=None,
                  meta_dir=None):
         self.logger = get_logger(self.__module__ + "." + self.__class__.__name__)
-        self.n_algorithm = n_algorithm
         self.n_algo_candidates = len(_cls_builtin_algorithms)
         self.task_type = task_type
         self.meta_algo = meta_algorithm
         self.rep = rep
-        self.metric = metric
         if task_type in CLS_TASKS:
             self.algorithms = _cls_builtin_algorithms
             self.n_algo_candidates = len(_cls_builtin_algorithms)
-            if metric not in ['acc', 'bal_acc']:
+            if metric not in ['acc', 'f1', 'auc']:
                 self.logger.info('Meta information about metric-%s does not exist, use accuracy instead.' % str(metric))
                 metric = 'acc'
         elif task_type in RGS_TASKS:
             self.algorithms = _rgs_builtin_algorithms
             self.n_algo_candidates = len(_rgs_builtin_algorithms)
-            if metric not in ['mse']:
+            if metric not in ['mse', 'r2', 'mae']:
                 self.logger.info('Meta information about metric-%s does not exist, use accuracy instead.' % str(metric))
                 metric = 'mse'
         else:
             raise ValueError('Invalid metric: %s.' % metric)
+        self.metric = metric
 
         self.total_resource = total_resource
         self.exclude_datasets = exclude_datasets
@@ -54,6 +53,21 @@ class BaseAdvisor(object):
         builtin_loc = os.path.join(builtin_loc, 'meta_resource')
         self.meta_dir = meta_dir if meta_dir is not None else builtin_loc
 
+        if task_type in CLS_TASKS:
+            task_prefix = 'cls'
+        else:
+            task_prefix = 'rgs'
+
+        meta_datasets = set()
+        _folder = os.path.join(self.meta_dir, 'meta_dataset_vec')
+        embedding_path = os.path.join(_folder, '%s_meta_dataset_embedding.pkl' % task_prefix)
+        with open(embedding_path, 'rb')as f:
+            d = pkl.load(f)
+            meta_datasets = d['task_ids']
+
+        if self.exclude_datasets is not None:
+            self.exclude_datasets = [t for t in self.exclude_datasets if 'init_%s'%t in meta_datasets]
+
         if self.exclude_datasets is None:
             self.hash_id = 'none'
         else:
@@ -62,20 +76,11 @@ class BaseAdvisor(object):
             md5 = hashlib.md5()
             md5.update(exclude_str.encode('utf-8'))
             self.hash_id = md5.hexdigest()
-        meta_datasets = set()
-        _folder = os.path.join(self.meta_dir, 'meta_dataset_vec')
 
-        if task_type in CLS_TASKS:
-            task_prefix = 'cls'
-        else:
-            task_prefix = 'rgs'
-
-        embedding_path = os.path.join(_folder, '%s_meta_dataset_embedding.pkl' % task_prefix)
-        with open(embedding_path, 'rb')as f:
-            d = pkl.load(f)
-            meta_datasets = d['task_ids']
-
-        self._builtin_datasets = sorted(list(meta_datasets))
+        self._builtin_datasets = []
+        for t in sorted(list(meta_datasets)):
+            if self.exclude_datasets is None or t[5:] not in self.exclude_datasets:
+                self._builtin_datasets.append(t)
 
         self.metadata_manager = MetaDataManager(self.meta_dir, self.algorithms, self._builtin_datasets,
                                                 metric, total_resource, task_type=task_type, rep=rep)
@@ -84,6 +89,7 @@ class BaseAdvisor(object):
     def fetch_algorithm_set(self, dataset, datanode=None):
         input_vector = get_feature_vector(dataset, task_type=self.task_type)
         if input_vector is None:
+            from mindware.datasets.utils import calculate_metafeatures
             input_dict = calculate_metafeatures(dataset=datanode, task_type=self.task_type)
             sorted_keys = sorted(input_dict.keys())
             input_vector = [input_dict[key] for key in sorted_keys]

@@ -10,6 +10,7 @@ from mindware.components.utils.model_util import softmax
 class QDA(BaseClassificationModel):
 
     def __init__(self, reg_param, random_state=None):
+        BaseClassificationModel.__init__(self)
         if reg_param is not None:
             self.reg_param = float(reg_param)
         else:
@@ -20,6 +21,8 @@ class QDA(BaseClassificationModel):
 
     def fit(self, X, Y):
         import sklearn.discriminant_analysis
+        from sklearn.utils.multiclass import unique_labels
+        self.classes_ = unique_labels(Y)
 
         estimator = sklearn.discriminant_analysis. \
             QuadraticDiscriminantAnalysis(reg_param=self.reg_param)
@@ -71,7 +74,7 @@ class QDA(BaseClassificationModel):
                 'output': (PREDICTIONS,)}
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None):
+    def get_hyperparameter_search_space(dataset_properties=None, **kwargs):
         reg_param = UniformFloatHyperparameter('reg_param', 0.0, 1.0,
                                                default_value=0.0)
 

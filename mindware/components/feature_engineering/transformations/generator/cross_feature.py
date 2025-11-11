@@ -42,7 +42,7 @@ class CrossFeatureTransformation(Transformer):
         return _X
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         cs = ConfigurationSpace()
         random_state = UniformIntegerHyperparameter("random_state", 1, 100000, default_value=1)
         cs.add_hyperparameter(random_state)

@@ -63,6 +63,7 @@ class Transformer(object, metaclass=abc.ABCMeta):
         self._compound_mode = 'only_new'
         self.random_state = random_state
         self.sample_size = 2
+    
 
     @property
     def compound_mode(self):
@@ -96,6 +97,8 @@ class Transformer(object, metaclass=abc.ABCMeta):
                     and self.model == other.model and self.compound_mode == other.compound_mode:
                 return True
         return False
+    
+
 
     @abc.abstractmethod
     def operate(self, data_nodes: DataNode or typing.List[DataNode],
@@ -154,14 +157,21 @@ def ease_trans(func):
         if isinstance(trans.output_type, list):
             trans.output_type = trans.output_type[0]
         _types = [trans.output_type] * _X.shape[1]
+        input_feature_map = input.feature_map.copy()
 
         if trans.compound_mode == 'only_new':
             new_X = _X
             new_types = _types
+            feature_map = None
+
         elif trans.compound_mode == 'concatenate':
             new_X = np.hstack((X, _X))
             new_types = input.feature_types.copy()
             new_types.extend(_types)
+            n_max = max(input_feature_map) + 1
+            feature_map = input_feature_map + [i for i in range(n_max, n_max+(_X).shape[1])]
+            
+
         elif trans.compound_mode == 'replace':
             new_X = np.hstack((X, _X))
             new_types = input.feature_types.copy()
@@ -169,14 +179,17 @@ def ease_trans(func):
             new_X = np.delete(new_X, target_fields, axis=1)
             temp_array = np.array(new_types)
             new_types = list(np.delete(temp_array, target_fields))
+            feature_map = None
+
         else:
             assert _X.shape[1] == len(target_fields)
             new_X = X.copy()
             new_X = new_X.astype(float)
             new_X[:, target_fields] = _X
             new_types = input.feature_types.copy()
+            feature_map = input_feature_map
 
-        output_datanode = DataNode((new_X, y), new_types, input.task_type)
+        output_datanode = DataNode((new_X, y), new_types, input.task_type, feature_map=feature_map)
         output_datanode.trans_hist = input.trans_hist.copy()
         output_datanode.trans_hist.append(trans.type)
         output_datanode.enable_balance = input.enable_balance

@@ -29,13 +29,20 @@ class OneHotTransformation(Transformer):
         new_X = self.model.transform(X_input).toarray()
         X_output = X.copy()
 
+        categories = self.model.categories_
+        input_feature_map = input_datanode.feature_map.copy()
+        new_feature_map = [map_ for i,map_ in enumerate(input_feature_map) if i not in target_fields]
+        n_max = max(new_feature_map)+1 if len(new_feature_map)!=0 else 0
+        
+        new_feature_map += [i+n_max  for i in range(len(categories)) for j in range(len(categories[i]))]
+    
         # Delete the original columns.
         X_output = np.delete(X_output, np.s_[target_fields], axis=1)
         X_output = np.hstack((X_output, new_X))
         feature_types = input_datanode.feature_types.copy()
         feature_types = list(np.delete(feature_types, target_fields))
         feature_types.extend([CATEGORICAL] * new_X.shape[1])
-        output_datanode = DataNode((X_output, y), feature_types, input_datanode.task_type)
+        output_datanode = DataNode((X_output, y), feature_types, input_datanode.task_type, feature_map=new_feature_map)
         output_datanode.trans_hist = input_datanode.trans_hist.copy()
         output_datanode.trans_hist.append(self.type)
 

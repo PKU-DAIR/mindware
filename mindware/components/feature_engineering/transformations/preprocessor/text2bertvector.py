@@ -51,6 +51,6 @@ class Text2BertVectorTransformation(Transformer):
         return _X
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='tpe'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='tpe', **kwargs):
         cs = ConfigurationSpace()
         return cs

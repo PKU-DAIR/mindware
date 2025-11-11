@@ -1,5 +1,5 @@
 import time
-
+from packaging.version import parse as V
 import numpy as np
 import sklearn.ensemble
 from ConfigSpace.configuration_space import ConfigurationSpace
@@ -19,6 +19,7 @@ class GradientBoostingClassifier(IterativeComponentWithSampleWeight,
                  min_weight_fraction_leaf, max_depth, criterion, max_features,
                  max_leaf_nodes, min_impurity_decrease, random_state=None,
                  verbose=0):
+        BaseClassificationModel.__init__(self)
         self.loss = loss
         self.learning_rate = learning_rate
         self.n_estimators = n_estimators
@@ -36,9 +37,10 @@ class GradientBoostingClassifier(IterativeComponentWithSampleWeight,
         self.estimator = None
         self.fully_fit_ = False
 
-    def iterative_fit(self, X, y, sample_weight=None, n_iter=1, refit=False):
+    def iterative_fit(self, X, Y, sample_weight=None, n_iter=1, refit=False):
 
-        # Special fix for gradient boosting!
+        from sklearn.ensemble import GradientBoostingClassifier as GBC
+        
         if isinstance(X, np.ndarray):
             X = np.ascontiguousarray(X, dtype=X.dtype)
         if refit:
@@ -63,7 +65,7 @@ class GradientBoostingClassifier(IterativeComponentWithSampleWeight,
             self.min_impurity_decrease = float(self.min_impurity_decrease)
             self.verbose = int(self.verbose)
 
-            self.estimator = sklearn.ensemble.GradientBoostingClassifier(
+            self.estimator = GBC(
                 loss=self.loss,
                 learning_rate=self.learning_rate,
                 n_estimators=n_iter,
@@ -85,7 +87,7 @@ class GradientBoostingClassifier(IterativeComponentWithSampleWeight,
             self.estimator.n_estimators = min(self.estimator.n_estimators,
                                               self.n_estimators)
 
-        self.estimator.fit(X, y, sample_weight=sample_weight)
+        self.estimator.fit(X, Y, sample_weight=sample_weight)
 
         # Apparently this if is necessary
         if self.estimator.n_estimators >= self.n_estimators:
@@ -121,9 +123,17 @@ class GradientBoostingClassifier(IterativeComponentWithSampleWeight,
                 'output': (PREDICTIONS,)}
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None):
+    def get_hyperparameter_search_space(dataset_properties=None, **kwargs):
         cs = ConfigurationSpace()
-        loss = Constant("loss", "deviance")
+        
+        SKLEARN_VERSION = V(sklearn.__version__)
+        if SKLEARN_VERSION < V("1.1.3"):
+            loss = Constant("loss", "deviance")
+        elif SKLEARN_VERSION <= V("1.8"):
+            loss = Constant("loss", "log_loss")
+        else:
+            raise RuntimeError("Unsupported sklearn version: {}".format(sklearn.__version__))
+        
         learning_rate = UniformFloatHyperparameter(
             name="learning_rate", lower=0.01, upper=1, default_value=0.1, log=True)
         # n_estimators = UniformIntegerHyperparameter(
@@ -131,9 +141,16 @@ class GradientBoostingClassifier(IterativeComponentWithSampleWeight,
         n_estimators = Constant("n_estimators", 100)
         max_depth = UniformIntegerHyperparameter(
             name="max_depth", lower=1, upper=8, default_value=3)
-        criterion = CategoricalHyperparameter(
-            'criterion', ['friedman_mse', 'mse'],
-            default_value='mse')
+
+        if SKLEARN_VERSION < V("1.0.2"):
+            criterion = CategoricalHyperparameter(
+                'criterion', ['friedman_mse', 'mse'], default_value='friedman_mse')
+        elif SKLEARN_VERSION <= V("1.8"):
+            criterion = CategoricalHyperparameter(
+                'criterion', ['friedman_mse', 'squared_error'], default_value='friedman_mse')
+        else:
+            raise RuntimeError("Unsupported sklearn version: {}".format(sklearn.__version__))
+
         min_samples_split = UniformIntegerHyperparameter(
             name="min_samples_split", lower=2, upper=20, default_value=2)
         min_samples_leaf = UniformIntegerHyperparameter(

@@ -9,6 +9,7 @@ from mindware.components.utils.constants import DENSE, SPARSE, UNSIGNED_DATA, PR
 class KNearestNeighborsClassifier(BaseClassificationModel):
 
     def __init__(self, n_neighbors, weights, p, random_state=None):
+        BaseClassificationModel.__init__(self)
         self.n_neighbors = n_neighbors
         self.weights = weights
         self.p = p
@@ -18,11 +19,13 @@ class KNearestNeighborsClassifier(BaseClassificationModel):
 
     def fit(self, X, Y):
         import sklearn.multiclass
+        from sklearn.utils.multiclass import unique_labels
+        self.classes_ = unique_labels(Y)
 
         estimator = \
             sklearn.neighbors.KNeighborsClassifier(n_neighbors=self.n_neighbors,
                                                    weights=self.weights,
-                                                   p=self.p)
+                                                   p=self.p, n_jobs=self.n_jobs)
 
         if len(Y.shape) == 2 and Y.shape[1] > 1:
             self.estimator = sklearn.multiclass.OneVsRestClassifier(estimator, n_jobs=1)
@@ -55,11 +58,19 @@ class KNearestNeighborsClassifier(BaseClassificationModel):
                 'output': (PREDICTIONS,)}
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
+        meta_mask = kwargs.get('meta', False)
+
+        # Expected n_neighbors <= n_samples
+        n_samples = kwargs.get('n_samples', None)
+        n_neighbors_upper = 100
+        if not meta_mask:
+            n_neighbors_upper = min(100, n_samples) if n_samples is not None else 100
+
         if optimizer == 'smac':
             cs = ConfigurationSpace()
             n_neighbors = UniformIntegerHyperparameter(
-                name="n_neighbors", lower=1, upper=100, log=True, default_value=1)
+                name="n_neighbors", lower=1, upper=n_neighbors_upper, log=True, default_value=1)
             weights = CategoricalHyperparameter(
                 name="weights", choices=["uniform", "distance"], default_value="uniform")
             p = CategoricalHyperparameter(name="p", choices=[1, 2], default_value=2)
@@ -68,7 +79,7 @@ class KNearestNeighborsClassifier(BaseClassificationModel):
             return cs
         elif optimizer == 'tpe':
             from hyperopt import hp
-            space = {'n_neighbors': hp.randint('knn_n_neighbors', 100) + 1,
+            space = {'n_neighbors': hp.randint('knn_n_neighbors', n_neighbors_upper) + 1,
                      'weights': hp.choice('knn_weights', ['uniform', 'distance']),
                      'p': hp.choice('knn_p', [1, 2])}
 

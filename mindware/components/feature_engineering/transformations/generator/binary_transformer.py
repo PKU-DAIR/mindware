@@ -45,7 +45,7 @@ class BinaryTransformation(Transformer):
             raise ValueError("Unknown param name %s!" % str(param))
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         optional_funcs = ['add', 'sub', 'mul', 'div']
         if optimizer == 'smac':
             cs = ConfigurationSpace()

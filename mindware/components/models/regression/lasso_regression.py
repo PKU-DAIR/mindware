@@ -1,6 +1,6 @@
 import numpy as np
 from ConfigSpace.configuration_space import ConfigurationSpace
-from ConfigSpace.hyperparameters import UniformFloatHyperparameter
+from ConfigSpace.hyperparameters import UniformFloatHyperparameter, UniformIntegerHyperparameter
 
 from mindware.components.models.base_model import BaseRegressionModel
 from mindware.components.utils.constants import DENSE, SPARSE, UNSIGNED_DATA, PREDICTIONS
@@ -8,6 +8,7 @@ from mindware.components.utils.constants import DENSE, SPARSE, UNSIGNED_DATA, PR
 
 class LassoRegressor(BaseRegressionModel):
     def __init__(self, alpha, tol, max_iter, random_state=None):
+        BaseRegressionModel.__init__(self)
         self.alpha = alpha
         self.tol = tol
         self.max_iter = max_iter
@@ -42,13 +43,13 @@ class LassoRegressor(BaseRegressionModel):
                 'output': (PREDICTIONS,)}
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         if optimizer == 'smac':
             alpha = UniformFloatHyperparameter("alpha", 0.01, 32, log=True, default_value=1.0)
             tol = UniformFloatHyperparameter("tol", 1e-6, 1e-2, default_value=1e-4,
                                              log=True)
 
-            max_iter = UniformFloatHyperparameter("max_iter", 100, 1000, q=100, default_value=100)
+            max_iter = UniformIntegerHyperparameter("max_iter", 100, 1000, q=100, default_value=100)
 
             cs = ConfigurationSpace()
             cs.add_hyperparameters([alpha, tol, max_iter])

@@ -8,13 +8,14 @@ def fetch_predict_estimator(task_type, estimator_id, config, X_train, y_train, w
     from mindware.components.utils.balancing import get_weights, smote
     _fit_params = {}
     config_dict = config.copy()
-    if weight_balance == 1:
-        _init_params, _fit_params = get_weights(
-            y_train, estimator_id, None, {}, {})
+    if task_type in CLS_TASKS and weight_balance == 1:
+        _init_params, fit_params = get_weights(y_train, estimator_id, None, {}, {})
         for key, val in _init_params.items():
             config_dict[key] = val
-    if data_balance == 1:
-        X_train, y_train = smote(X_train, y_train)
+        if 'sample_weight' in fit_params:
+            _fit_params['sample_weight'] = fit_params['sample_weight']
+        elif data_balance == 1:
+            X_train, y_train = smote(X_train, y_train)
     if task_type in CLS_TASKS:
         from mindware.components.evaluators.cls_evaluator import get_estimator
     elif task_type in RGS_TASKS:

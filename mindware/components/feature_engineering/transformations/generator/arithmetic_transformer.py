@@ -47,7 +47,7 @@ class ArithmeticTransformation(Transformer):
             raise ValueError("Unknown param name %s!" % str(param))
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         optional_funcs = ['log', 'sqrt', 'square', 'freq', 'round', 'sigmoid', 'tanh']
         if optimizer == 'smac':
             cs = ConfigurationSpace()

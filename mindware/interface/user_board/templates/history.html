@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Mindware</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="all,follow">
+    <link rel="stylesheet" href="/static/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/vendor/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/static/css/style.default.css" id="theme-stylesheet">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        /* 设置目录栏的宽度和背景色 */
+        .sidebar {
+            height: 100%;
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+
+        @font-face {
+          font-family: 'Courgette';
+          src: url("/static/vendor/google-fonts/Courgette-Regular.ttf") format('truetype');
+        }
+
+        /* 设置目录栏中链接的样式 */
+        .sidebar h2 {
+            font-family: 'Courgette', cursive; /* 使用 Pacifico 字体 */
+            font-weight: bold;
+            padding: 10px;
+            text-decoration: none;
+            text-align: center; /* 让链接文本居中 */
+            font-size: 45px; /* 设置字体大小 */
+            color: #333; /* 设置字体颜色 */
+        }
+        .sidebar a {
+            font-weight: bold;
+            display: block;
+            padding: 10px;
+            text-decoration: none;
+            text-align: center; /* 让链接文本居中 */
+            font-size: 30px; /* 设置字体大小 */
+            color: #333; /* 设置字体颜色 */
+        }
+
+        /* 设置目录栏中链接的 hover 效果 */
+        .sidebar a:hover {
+            background-color: #ddd;
+        }
+
+        /* 设置内容区域的左边距，使其腾出目录栏的宽度 */
+        .content {
+            margin-left: 250px;
+            padding: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 弹窗模态框 -->
+    <div class="modal" id="myModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <!-- 模态框头部 -->
+                <div class="modal-header">
+                    <h4 class="modal-title">提示</h4>
+                    <button type="button" class="btn-close" onclick="$('#myModal').modal('hide');"></button>
+                </div>
+                <!-- 模态框主体 -->
+                <div class="modal-body">
+                    <p id="message"></p>
+                </div>
+                <!-- 模态框底部 -->
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="$('#myModal').modal('hide');">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 左侧目录栏 -->
+    <div class="sidebar">
+        <h2>Mindware</h2>
+        <ul class="list-unstyled">
+            <li><a href="/user_board/history">History</a></li>
+            <li><a href="/user_board/new_task">New Task</a></li>
+        </ul>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="content">
+        <h1>History</h1>
+
+        <div class="container">
+            <table id="taskTable" class="table table-bordered table-hover table-striped" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Task ID</th>
+                        <th>Task Type</th>
+                        <th>Opt Type</th>
+                        <th>Start Time</th>
+                        <th>End Time</th>
+                        <th>Task Info</th>
+                        <th>Details</th>
+                        <th>Delete</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 使用 JavaScript 在此处动态插入任务列表 -->
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+<script src="/static/vendor/jquery/jquery.js"></script>
+<script src="/static/vendor/jquery/jquery.md5.js"></script>
+<script src="/static/vendor/jquery.cookie/jquery.cookie.js"></script>
+<script src="/static/vendor/bootstrap/js/bootstrap.min.js"></script>
+<script src="/static/js/common.js"></script>
+
+    <!-- 你的其他 JavaScript 代码 -->
+<script>
+
+    // 删除任务
+    function deleteTask(task_id, task_start_time) {
+
+        // 弹窗确认
+        if (!confirm('Sure to delete the task？')) {
+            return;
+        }
+
+        $.ajax({
+            url: '/user_board/delete_task/',
+            type: 'POST',
+            data: {
+                task_id: task_id,
+                task_start_time: task_start_time
+            },
+            success: function(data) {
+                if (data['status_code'] == 200) {
+                    $('#message').text('delete successfully');
+                    $('#myModal').modal('show');
+                    show_tasks();
+                } else {
+                    $('#message').text('fail to delete');
+                    $('#myModal').modal('show');
+                }
+            },
+            error: function() {
+                $('#message').text('fail to delete');
+                $('#myModal').modal('show');
+            }
+        });
+    };
+
+    // 显示任务列表
+    function show_tasks() {
+        $.ajax({
+            url: '/user_board/get_tasks/',
+            type: 'GET',
+            success: function(data) {
+                // 清空表格内容
+                $('#taskTable tbody').empty();
+                // 使用数据更新表格内容
+                data['tasks'].forEach(function(task) {
+                    var row = '<tr>';
+                    row += '<td>' + task.task_id + '</td>';
+                    row += '<td>' + task.task_type + '</td>';
+                    row += '<td>' + task.opt_type + '</td>';
+                    row += '<td>' + task.task_start_time + '</td>';
+                    row += '<td>' + task.task_end_time + '</td>';
+                    row += '<td>' + task.task_info + '</td>';
+                    // row += '<td><button class="detail-button" onclick="showDetails(\'' + task.task_id +'\', \'' + task.task_start_time + '\')">show</button></td>';
+                    row += '<td><a class="detail-a" href="/user_board/get_task_details?task_id=' + task.task_id + '&task_start_time=' + task.task_start_time + '">show</a></td>';
+                    row += '<td><button class="delete-button" onclick="deleteTask(\'' + task.task_id +'\', \'' + task.task_start_time + '\')">delete</button></td>';
+                    row += '</tr>';
+                    $('#taskTable tbody').append(row);
+                });
+                // 显示表格
+                $('#taskTable').show();
+            },
+            error: function() {
+                alert('获取历史任务信息失败');
+            }
+        });
+    };
+
+    show_tasks();
+
+</script>
+
+</body>
+
+</html>

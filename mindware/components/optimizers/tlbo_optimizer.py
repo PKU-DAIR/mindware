@@ -17,7 +17,7 @@ class TlboOptimizer(BaseOptimizer):
     def __init__(self, evaluator, config_space, name, surrogate_type='tlbo_rgpe_prf',
                  metric='bal_acc', time_limit=None, evaluation_limit=None,
                  per_run_time_limit=300, per_run_mem_limit=1024, output_dir='./',
-                 inner_iter_num_per_iter=1, seed=1, n_jobs=1):
+                 inner_iter_num_per_iter=1, seed=1, n_jobs=1, topk=50):
         super().__init__(evaluator, config_space, name, seed)
         self.time_limit = time_limit
         self.evaluation_num_limit = evaluation_limit
@@ -39,7 +39,7 @@ class TlboOptimizer(BaseOptimizer):
                               history_bo_data=source_data,
                               surrogate_type=surrogate_type,
                               max_runs=int(1e10),
-                              time_limit_per_trial=self.per_run_time_limit,
+                              max_runtime_per_trial=self.per_run_time_limit,
                               logging_dir=output_dir)
 
         self.trial_cnt = 0
@@ -88,7 +88,7 @@ class TlboOptimizer(BaseOptimizer):
                 self.perfs.append(-_perf)
 
         runhistory = self.optimizer.get_history()
-        if self.name == 'hpo':
+        if self.name in ['hpo', 'cash', 'cashfe']:
             if hasattr(self.evaluator, 'fe_config'):
                 fe_config = self.evaluator.fe_config
             else:

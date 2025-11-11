@@ -1,12 +1,16 @@
 import os
 import pickle as pkl
+import joblib
 import hashlib
+import numpy as np
 
 
-def load_combined_transformer_estimator(model_dir, config, timestamp):
-    model_path = os.path.join(model_dir, '%s_%s.pkl' % (timestamp, CombinedTopKModelSaver.get_configuration_id(config)))
-    with open(model_path, 'rb') as f:
-        op_list, model, _ = pkl.load(f)
+def check_mode(mode):
+    assert mode in ['partial', 'cv', 'full', 'cvpartial']
+
+def load_combined_transformer_estimator(model_dir, config, timestamp, mode='partial', **kwargs):
+    model_path = CombinedTopKModelSaver.get_path_by_config(model_dir, config, timestamp, mode=mode, **kwargs)
+    op_list, model, _ = CombinedTopKModelSaver._load(model_path)
     return op_list, model
 
 
@@ -46,8 +50,63 @@ class CombinedTopKModelSaver(BaseTopKModelSaver):
         return sha.hexdigest()
 
     @staticmethod
-    def get_path_by_config(output_dir, config, identifier):
-        return os.path.join(output_dir, '%s_%s.pkl' % (identifier, CombinedTopKModelSaver.get_configuration_id(config)))
+    def get_parse_path(ori_path, mode='partial', **kwargs):
+        check_mode(mode)
+        prefix = ''
+        if mode.startswith('cv'):
+            folds = kwargs['folds']
+            prefix = "%s%d_" % (mode, folds)
+            shuffle = kwargs.get('shuffle', False)
+            if shuffle:
+                seed = kwargs['seed']
+                prefix = "%s%d_s%d_" % (mode, folds, seed)
+        elif mode == 'full':
+            prefix = "%s_" % mode
+        dir_path, filename = os.path.split(ori_path)
+        new_filename = prefix + filename
+        return os.path.join(dir_path, new_filename)
+
+    @staticmethod
+    def get_path_by_config(output_dir, config, identifier, compress=True, mode='partial', **kwargs):
+        if compress or config['algorithm'] in ['extra_trees']:
+            path = os.path.join(output_dir, '%s_%s.joblib' % (identifier, CombinedTopKModelSaver.get_configuration_id(config)))
+        else:
+            path = os.path.join(output_dir, '%s_%s.pkl' % (identifier, CombinedTopKModelSaver.get_configuration_id(config)))
+
+        return CombinedTopKModelSaver.get_parse_path(os.path.abspath(path), mode, **kwargs)
+
+    @staticmethod
+    def _save(items, save_path: str):
+        if save_path.endswith('joblib'):
+            with open(save_path, 'wb') as f:
+                joblib.dump(items, f, compress=True)
+        elif save_path.endswith('pkl'):
+            with open(save_path, 'wb') as f:
+                pkl.dump(items, f)
+        else:
+            raise ValueError("Invalid config path: %s", save_path)
+
+    @staticmethod
+    def _load(load_path: str):
+        if load_path.endswith('joblib'):
+            with open(load_path, 'rb') as f:
+                return joblib.load(f)
+        elif load_path.endswith('pkl'):
+            with open(load_path, 'rb') as f:
+                return pkl.load(f)
+        elif load_path.endswith('npy'):
+            return np.load(load_path)
+        else:
+            raise ValueError("Invalid config path: %s", load_path)
+
+    @staticmethod
+    def save_config(items, save_path):
+        if not os.path.exists(save_path):
+            CombinedTopKModelSaver._save(items=items, save_path=save_path)
+        else:
+            _, _, perf = CombinedTopKModelSaver._load(load_path=save_path)
+            if items[2] > perf:
+                CombinedTopKModelSaver._save(items=items, save_path=save_path)
 
     def add(self, config, perf, estimator_id):
         """
@@ -67,7 +126,8 @@ class CombinedTopKModelSaver(BaseTopKModelSaver):
 
         # Update existed configs
         for sorted_element in sorted_list:
-            if config == sorted_element[0]:
+            # if config == sorted_element[0]:
+            if config == sorted_element[0] or model_path_id == sorted_element[2]:  # 用path判断是否相同，因为hash的时候取了5位近似（会出现conf不同但hash相同的情况）
                 if perf > sorted_element[1]:
                     sorted_list.remove(sorted_element)
                     for idx, item in enumerate(sorted_list):

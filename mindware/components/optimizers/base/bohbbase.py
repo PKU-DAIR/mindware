@@ -12,23 +12,21 @@ from mindware.components.optimizers.base.config_space_utils import convert_confi
 from mindware.components.computation.parallel_process import ParallelProcessEvaluator
 from mindware.utils.logging_utils import get_logger
 from mindware.components.optimizers.base.prob_rf import RandomForestWithInstances
+from mindware.utils.decorators import time_limit
 
 
 class BohbBase(object):
-    def __init__(self, eval_func, config_space, config_generator='tpe',
+    def __init__(self, eval_func, config_space, config_generator='tpe', per_run_time_limit=600,
                  seed=1, R=27, eta=3, n_jobs=1):
         self.eval_func = eval_func
         self.config_space = config_space
         self.config_generator = config_generator
         self.n_workers = n_jobs
+        self.per_run_time_limit = per_run_time_limit
 
         self.trial_cnt = 0
-        self.configs = list()
-        self.perfs = list()
-        self.incumbent_perf = float("-INF")
-        self.incumbent_config = self.config_space.get_default_configuration()
-        self.incumbent_configs = list()
-        self.incumbent_perfs = list()
+        self.full_eval_configs = list()
+        self.full_eval_perfs = list()
         self.global_start_time = time.time()
         self.time_ticks = list()
         self.logger = get_logger(self.__module__ + "." + self.__class__.__name__)
@@ -39,9 +37,9 @@ class BohbBase(object):
         self.eta = eta
         self.seed = seed
         self.logeta = lambda x: log(x) / log(self.eta)
-        self.s_max = int(self.logeta(self.R))
-        self.B = (self.s_max + 1) * self.R
-        self.s_values = list(reversed(range(self.s_max + 1)))
+        self.s_max = int(self.logeta(self.R))  # 3
+        self.B = (self.s_max + 1) * self.R  # 4 * 27, 一整个SH 需要的资源数
+        self.s_values = list(reversed(range(self.s_max + 1)))  # 3, 2, 1, 0
         self.inner_iter_id = 0
 
         # Parameters in BOHB.
@@ -49,7 +47,7 @@ class BohbBase(object):
         self.target_x = dict()
         self.target_y = dict()
         self.exp_output = dict()
-        for index, item in enumerate(np.logspace(0, self.s_max, self.s_max + 1, base=self.eta)):
+        for index, item in enumerate(np.logspace(0, self.s_max, self.s_max + 1, base=self.eta)):  # 0, 3, 9, 27
             r = int(item)
             self.iterate_r.append(r)
             self.target_x[r] = list()
@@ -69,8 +67,6 @@ class BohbBase(object):
 
         self.config_gen = TPE(config_space)
 
-        self.eval_dict = dict()
-
     def _iterate(self, s, budget=MAX_INT, skip_last=0):
         # Set initial number of configurations
         n = int(ceil(self.B / self.R / (s + 1) * self.eta ** s))
@@ -83,6 +79,8 @@ class BohbBase(object):
         time_elapsed = time.time() - start_time
         self.logger.info("Choosing next batch of configurations took %.2f sec." % time_elapsed)
 
+        iter_full_eval_configs = list()
+        iter_full_eval_perfs = list()
         with ParallelProcessEvaluator(self.eval_func, n_worker=self.n_workers) as executor:
             for i in range((s + 1) - int(skip_last)):  # changed from s + 1
                 if time.time() >= budget + start_time:
@@ -94,22 +92,57 @@ class BohbBase(object):
                 n_configs = n * self.eta ** (-i)
                 n_resource = r * self.eta ** i
 
+                resource_ratio = float(n_resource / self.R)
+
                 self.logger.info("BOHB: %d configurations x size %d / %d each" %
                                  (int(n_configs), n_resource, self.R))
 
-                val_losses = executor.parallel_execute(T, resource_ratio=float(n_resource / self.R),
-                                                       eta=self.eta,
-                                                       first_iter=(i == 0))
-                for _id, _val_loss in enumerate(val_losses):
-                    if np.isfinite(_val_loss):
-                        self.target_x[int(n_resource)].append(T[_id])
-                        self.target_y[int(n_resource)].append(_val_loss)
+                if self.n_workers > 1:
+                    val_losses = executor.parallel_execute(T, resource_ratio=resource_ratio,
+                                                           eta=self.eta,
+                                                           first_iter=(i == 0))
+
+                    for _id, _val_loss in enumerate(val_losses):
+                        if isinstance(_val_loss, dict):
+                            val_losses[_id] = _val_loss['objectives'][0]
+
+                    for _id, _val_loss in enumerate(val_losses):
+                        if np.isfinite(_val_loss):
+                            self.target_x[int(n_resource)].append(T[_id])
+                            self.target_y[int(n_resource)].append(_val_loss)
+
+                else:
+                    val_losses = list()
+                    for config in T:
+                        if time.time() - start_time > budget:
+                            self.logger.warning('Time limit exceeded!')
+                            break
+
+                        try:
+                            with time_limit(self.per_run_time_limit):
+                                val_loss = self.eval_func(config, resource_ratio=resource_ratio,
+                                                          eta=self.eta, first_iter=(i == 0))
+                        except Exception as e:
+                            val_loss = np.inf
+
+                        if isinstance(val_loss, dict):
+                            val_loss = val_loss['objectives'][0]
+
+                        val_losses.append(val_loss)
+
+                        if np.isfinite(val_loss):
+                            self.target_x[int(n_resource)].append(config)
+                            self.target_y[int(n_resource)].append(val_loss)
 
                 self.exp_output[time.time()] = (int(n_resource), T, val_losses)
 
+                self.logger.info('iter: %d, resource: %d, val_loss: %s' % (i, n_resource, str(val_losses)))
+
                 if int(n_resource) == self.R:
-                    self.incumbent_configs.extend(T)
-                    self.incumbent_perfs.extend(val_losses)
+                    self.full_eval_configs.extend(T)
+                    self.full_eval_perfs.extend(val_losses)
+                    iter_full_eval_configs.extend(T)
+                    iter_full_eval_perfs.extend(val_losses)
                     self.time_ticks.extend([time.time() - self.global_start_time] * len(T))
 
                     # Only update results using maximal resources
@@ -135,10 +168,12 @@ class BohbBase(object):
                 normalized_y = std_normalization(self.target_y[resource_val])
                 self.surrogate.train(convert_configurations_to_array(self.target_x[resource_val]),
                                      np.array(normalized_y, dtype=np.float64))
+                
+        return iter_full_eval_configs, iter_full_eval_perfs
 
     def smac_get_candidate_configurations(self, num_config):
         if len(self.target_y[self.iterate_r[-1]]) <= 3:
-            return sample_configurations(self.config_space, num_config)
+            return sample_configurations(self.config_space, num_config, logger=self.logger)
 
         incumbent = dict()
         max_r = self.iterate_r[-1]
@@ -153,7 +188,14 @@ class BohbBase(object):
         idx_acq = 0
         for _id in range(num_config):
             if rd.random() < p_threshold or _id >= len(config_candidates):
+                i = 0
                 config = sample_configurations(self.config_space, 1)[0]
+                while config in candidates:
+                    config = sample_configurations(self.config_space, 1)[0]
+                    i += 1
+                    if i > 1000:
+                        self.logger.warning('Cannot sample a new random configuration after 1000 iters.')
+                        break
             else:
                 config = config_candidates[idx_acq]
                 idx_acq += 1
@@ -165,9 +207,14 @@ class BohbBase(object):
 
         config_left = num_config
         while config_left:
+            i = 0
             config = self.config_gen.get_config()[0]
-            if config in config_candidates:
-                continue
+            while config in config_candidates:
+                config = self.config_gen.get_config()[0]
+                i += 1
+                if i > 1000:
+                    self.logger.warning('Cannot sample a new configuration after 1000 iters.')
+                    break
             config_candidates.append(config)
             config_left -= 1
 
@@ -176,11 +223,20 @@ class BohbBase(object):
         idx_acq = 0
         for _id in range(num_config):
             if rd.random() < p_threshold:
+                i = 0
                 config = sample_configurations(self.config_space, 1)[0]
+                while config in candidates:
+                    config = sample_configurations(self.config_space, 1)[0]
+                    i += 1
+                    if i > 1000:
+                        self.logger.warning('Cannot sample a new random configuration after 1000 iters.')
+                        break
             else:
                 config = config_candidates[idx_acq]
                 idx_acq += 1
-            candidates.append(config)
+            if config not in config_candidates:
+                candidates.append(config)
+
         return candidates
 
     def get_candidate_configurations(self, num_config):

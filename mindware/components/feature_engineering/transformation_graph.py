@@ -3,7 +3,7 @@ from mindware.components.utils.constants import CATEGORICAL
 
 
 class DataNode(object):
-    def __init__(self, data=None, feature_type=None, task_type=None, feature_names=None):
+    def __init__(self, data=None, feature_type=None, task_type=None, feature_names=None, feature_map=None):
         self.task_type = task_type
         self.data = data
         self.feature_types = feature_type
@@ -15,7 +15,19 @@ class DataNode(object):
         self.enable_balance = 0
         self.data_balance = 0
         self.config = None
+       
+        if feature_map == None:
+            self.feature_map = [i for i in range(self.data[0].shape[1])]
+        else:
+            if self.data[0] is not None:
+                assert len(feature_map) == self.data[0].shape[1], f'Feature maps length should equal feature types'
+            
+            self.feature_map = feature_map
+        
+    def reset_feature_map(self):
 
+        self.feature_map = [i for i in range(self.data[0].shape[1])]
+    
     def __eq__(self, node):
         """Overrides the default implementation"""
         if isinstance(node, DataNode):
@@ -37,11 +49,15 @@ class DataNode(object):
         y = np.vstack((y1, y2))
         return DataNode(data=[X, y], feature_type=feat_types)
 
-    def copy_(self):
-        new_data = list([self.data[0].copy()])
-        new_data.append(None if self.data[1] is None else self.data[1].copy())
-        new_node = DataNode(new_data, self.feature_types.copy(), self.task_type,
-                            self.feature_names.copy() if self.feature_names is not None else None)
+    def copy_(self, no_data=False):
+        if no_data:
+            new_data = [None, None]
+        else:
+            new_data = list([self.data[0].copy()])
+            new_data.append(None if self.data[1] is None else self.data[1].copy())
+        new_node = DataNode(new_data, self.feature_types.copy() if self.feature_types is not None else None, self.task_type,
+                            self.feature_names.copy() if self.feature_names is not None else None, 
+                            self.feature_map.copy() if self.feature_map is not None else None)
         new_node.trans_hist = self.trans_hist.copy()
         new_node.depth = self.depth
         new_node.enable_balance = self.enable_balance

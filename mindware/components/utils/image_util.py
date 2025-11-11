@@ -6,7 +6,8 @@ try:
     import torch
     import torchvision
 except ImportError:
-    warnings.warn("Pillow, torch or torchvision not installed! Image2Vector will fail!")
+    # warnings.warn("Pillow, torch or torchvision not installed! Image2Vector will fail!")
+    pass
 
 
 class Image2vector():

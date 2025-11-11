@@ -73,7 +73,7 @@ class RandomTreesEmbeddingTransformation(Transformer):
         return _X
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         n_estimators = UniformIntegerHyperparameter(name="n_estimators",
                                                     lower=10, upper=100,
                                                     default_value=10)

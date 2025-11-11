@@ -71,7 +71,6 @@ class MetaDataManager(object):
         self.metric = metric
         self.resource_n = resource_n
 
-        self._task_ids = list()
         self._dataset_embedding = list()
         self._dataset_perf4algo = list()
 
@@ -85,10 +84,11 @@ class MetaDataManager(object):
 
         task_id = 'init_%s' % dataset
         idx = data2['task_ids'].index(task_id)
-        return data2['perf4algo'][idx]
+        sel_idx2 = [data2['algorithms_included'].index(t) for t in self.builtin_algorithms]
+        return data2['perf4algo'][self.metric][idx, sel_idx2]
 
     def load_meta_data(self):
-        X, perf4algo, task_ids = list(), list(), list()
+        X, perf4algo = list(), list()
         meta_dataset_dir = os.path.join(self.metadata_dir, 'meta_dataset_vec')
         save_path1 = os.path.join(meta_dataset_dir, '%s_meta_dataset_embedding.pkl' % self.task_prefix)
         save_path2 = os.path.join(meta_dataset_dir, '%s_meta_dataset_algo2perf.pkl' % self.task_prefix)
@@ -99,13 +99,15 @@ class MetaDataManager(object):
             with open(save_path2, 'rb') as f:
                 data2 = pickle.load(f)
             _X = list()
-            for task_id in data2['task_ids']:
+            for task_id in self.builtin_datasets:
                 idx = data1['task_ids'].index(task_id)
                 _X.append(data1['dataset_embedding'][idx])
 
             self._dataset_embedding = np.asarray(_X)
-            self._task_ids = data2['task_ids']
-            self._dataset_perf4algo = data2['perf4algo']
+            _dataset_perf4algo = data2['perf4algo'][self.metric]
+            sel_idx1 = [data2['task_ids'].index(t) for t in self.builtin_datasets]
+            sel_idx2 = [data2['algorithms_included'].index(t) for t in self.builtin_algorithms]
+            self._dataset_perf4algo = _dataset_perf4algo[sel_idx1][:, sel_idx2]
         else:
             for _dataset in self.builtin_datasets:
                 print('Creating embedding for dataset - %s.' % _dataset)
@@ -119,7 +121,6 @@ class MetaDataManager(object):
 
                 X.append(meta_instance)
 
-                task_ids.append('init_%s' % _dataset)
                 # Extract the performance for each algorithm on this dataset.
                 scores = fetch_algorithm_runs(self.metadata_dir, _dataset, self.metric,
                                               self.resource_n, self.rep_num, self.builtin_algorithms)
@@ -127,8 +128,6 @@ class MetaDataManager(object):
 
             self._dataset_embedding = np.asarray(X)
             self._dataset_perf4algo = np.asarray(perf4algo)
-
-            self._task_ids = task_ids
 
             with open(save_path1, 'wb') as f:
                 data = dict()
@@ -140,10 +139,10 @@ class MetaDataManager(object):
                 data = dict()
                 data['task_ids'] = self._task_ids
                 data['algorithms_included'] = self.builtin_algorithms
-                data['perf4algo'] = self._dataset_perf4algo
+                data['perf4algo'] = {self.metric: self._dataset_perf4algo}
                 pickle.dump(data, f)
 
-        return self._dataset_embedding, self._dataset_perf4algo, self._task_ids
+        return self._dataset_embedding, self._dataset_perf4algo
 
     def add_meta_runs(self, task_id, dataset_vec, algo_perf):
         pass

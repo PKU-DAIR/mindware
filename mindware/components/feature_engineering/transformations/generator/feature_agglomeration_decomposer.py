@@ -26,6 +26,7 @@ class FeatureAgglomerationDecomposer(Transformer):
 
     @ease_trans
     def operate(self, input_datanode, target_fields=None):
+        import sklearn
         from sklearn.cluster import FeatureAgglomeration
 
         X, y = input_datanode.data
@@ -36,10 +37,17 @@ class FeatureAgglomerationDecomposer(Transformer):
             n_clusters = min(self.n_clusters, X.shape[1])
             if not callable(self.pooling_func):
                 self.pooling_func = self.pooling_func_mapping[self.pooling_func]
+            if sklearn.__version__ < '1.2.2':
+                self.model = FeatureAgglomeration(
+                    n_clusters=n_clusters, affinity=self.affinity,
+                    linkage=self.linkage, pooling_func=self.pooling_func)
+            elif '1.2.2' <= sklearn.__version__ <= '1.3.2':
+                self.model = FeatureAgglomeration(
+                    n_clusters=n_clusters, metric=self.affinity,
+                    linkage=self.linkage, pooling_func=self.pooling_func)
+            else:
+                raise ValueError("Unsupported sklearn version %s" % sklearn.__version__)
 
-            self.model = FeatureAgglomeration(
-                n_clusters=n_clusters, affinity=self.affinity,
-                linkage=self.linkage, pooling_func=self.pooling_func)
             self.model.fit(X)
 
         X_new = self.model.transform(X)
@@ -47,11 +55,20 @@ class FeatureAgglomerationDecomposer(Transformer):
         return X_new
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
+        meta_mask = kwargs.get('meta', False)
+        
+        zero_ratio_mask = kwargs.get('zero_ratio_mask', True) | meta_mask # if some features have too much zero, ignore cosine
+        
         cs = ConfigurationSpace()
         n_clusters = UniformIntegerHyperparameter("n_clusters", 2, 400, default_value=25)
-        affinity = CategoricalHyperparameter(
-            "affinity", ["euclidean", "manhattan", "cosine"], default_value="euclidean")
+        if zero_ratio_mask:
+            affinity = CategoricalHyperparameter(
+                "affinity", ["euclidean", "manhattan", "cosine"], default_value="euclidean")
+        else:
+            affinity = CategoricalHyperparameter(
+                "affinity", ["euclidean", "manhattan"], default_value="euclidean")
+            
         linkage = CategoricalHyperparameter(
             "linkage", ["ward", "complete", "average"], default_value="ward")
         pooling_func = CategoricalHyperparameter(
@@ -59,8 +76,13 @@ class FeatureAgglomerationDecomposer(Transformer):
 
         cs.add_hyperparameters([n_clusters, affinity, linkage, pooling_func])
 
-        affinity_and_linkage = ForbiddenAndConjunction(
-            ForbiddenInClause(affinity, ["manhattan", "cosine"]),
-            ForbiddenEqualsClause(linkage, "ward"))
+        if zero_ratio_mask:
+            affinity_and_linkage = ForbiddenAndConjunction(
+                ForbiddenInClause(affinity, ["manhattan", "cosine"]),
+                ForbiddenEqualsClause(linkage, "ward"))
+        else:
+            affinity_and_linkage = ForbiddenAndConjunction(
+                ForbiddenEqualsClause(affinity, "manhattan"),
+                ForbiddenEqualsClause(linkage, "ward"))
         cs.add_forbidden_clause(affinity_and_linkage)
         return cs

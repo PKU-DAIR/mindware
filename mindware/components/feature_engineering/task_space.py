@@ -42,7 +42,7 @@ def set_stage(udf_stage_list, stage_candidates_dict):
 
 def get_task_hyperparameter_space(task_type, include_preprocessors=None,
                                   include_text=False, include_image=False, if_imbal=False,
-                                  optimizer='smac'):
+                                  optimizer='smac', **cs_args):
     """
         Fetch the underlying hyperparameter space for feature engineering.
         Pipeline Space:
@@ -96,43 +96,46 @@ def get_task_hyperparameter_space(task_type, include_preprocessors=None,
     configs = dict()
 
     if include_image:
-        image_preprocessor_dict = _get_configuration_space(_image_preprocessor, optimizer=optimizer)
+        image_preprocessor_dict = _get_configuration_space(_image_preprocessor, optimizer=optimizer, **cs_args)
         configs['image_preprocessor'] = image_preprocessor_dict
     if include_text:
-        text_preprocessor_dict = _get_configuration_space(_text_preprocessor, optimizer=optimizer)
+        text_preprocessor_dict = _get_configuration_space(_text_preprocessor, optimizer=optimizer, **cs_args)
         configs['text_preprocessor'] = text_preprocessor_dict
 
     for stage in stage_list:
         if stage == 'preprocessor':
-            stage_dict = _get_configuration_space(preprocessor, trans_types, optimizer=optimizer)
+            stage_dict = _get_configuration_space(preprocessor, trans_types, optimizer=optimizer, **cs_args)
         elif stage == 'rescaler':
-            stage_dict = _get_configuration_space(_rescaler_candidates, trans_types, optimizer=optimizer)
+            stage_dict = _get_configuration_space(_rescaler_candidates, trans_types, optimizer=optimizer, **cs_args)
         elif stage == 'balancer':
             if task_type in CLS_TASKS:
-                stage_dict = _get_configuration_space(_balancer_candadates, optimizer=optimizer)
+                stage_dict = _get_configuration_space(_balancer_candadates, optimizer=optimizer, **cs_args)
             else:
                 stage_dict = None
         else:
             # Third party stage
             trans_types.extend([candidate.type for _, candidate in thirdparty_candidates_dict[stage].items()])
-            stage_dict = _get_configuration_space(thirdparty_candidates_dict[stage], trans_types, optimizer=optimizer)
+            stage_dict = _get_configuration_space(thirdparty_candidates_dict[stage], trans_types, optimizer=optimizer, **cs_args)
         configs[stage] = stage_dict
 
     cs = _build_hierachical_configspace(configs, optimizer=optimizer)
     return cs
 
 
-def _get_configuration_space(builtin_transformers, trans_type=None, optimizer='smac'):
+def _get_configuration_space(builtin_transformers, trans_type=None, optimizer='smac', **cs_args):
     config_dict = dict()
+    silence = cs_args.get('silence', False)
     for tran_key in builtin_transformers:
         tran = builtin_transformers[tran_key]
         tran_id = tran.type
         if trans_type is None or tran_id in trans_type:
             try:
                 sub_configuration_space = builtin_transformers[tran_key].get_hyperparameter_search_space(
-                    optimizer=optimizer)
+                    optimizer=optimizer, **cs_args)
                 config_dict[tran_key] = sub_configuration_space
-            except:
+            except Exception as e:
+                if not silence:
+                    print("Error while build cs for %s" % tran_key, e)
                 if optimizer == 'smac':
                     config_dict[tran_key] = ConfigurationSpace()
                 elif optimizer == 'tpe':

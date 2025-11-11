@@ -34,7 +34,7 @@ class Image2VectorTransformation(Transformer):
         return _X
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         method = CategoricalHyperparameter("method", ['resnet', 'vgg'], default_value='resnet')
 
         cs = ConfigurationSpace()

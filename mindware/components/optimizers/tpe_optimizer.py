@@ -6,33 +6,29 @@ from mindware.components.optimizers.base_optimizer import BaseOptimizer, MAX_INT
 
 
 class TPEOptimizer(BaseOptimizer):
-    def __init__(self, evaluator, config_space, name, eval_type, time_limit=None, evaluation_limit=None,
-                 per_run_time_limit=300, output_dir='./', timestamp=None,
-                 inner_iter_num_per_iter=1, seed=1, n_jobs=1):
-        super().__init__(evaluator, config_space, name, eval_type=eval_type, timestamp=timestamp, output_dir=output_dir,
-                         seed=seed)
-        self.time_limit = time_limit
-        self.evaluation_num_limit = evaluation_limit
-        self.inner_iter_num_per_iter = inner_iter_num_per_iter
-        self.per_run_time_limit = per_run_time_limit
-        # self.per_run_mem_limit = per_run_mem_limit
+    def __init__(self, evaluator, config_space, name, eval_type, 
+                 time_limit=None, evaluation_limit=None,
+                 per_run_time_limit=300, per_run_mem_limit=1024, 
+                 inner_iter_num_per_iter=1, timestamp=None,
+                 output_dir='./', seed=1, n_jobs=1, topk=50):
+        super(TPEOptimizer, self).__init__(evaluator=evaluator, config_space=config_space, name=name, eval_type=eval_type, 
+                                           time_limit=time_limit, evaluation_limit=evaluation_limit, 
+                                           per_run_time_limit=per_run_time_limit, per_run_mem_limit=per_run_mem_limit, 
+                                           inner_iter_num_per_iter=inner_iter_num_per_iter, timestamp=timestamp, 
+                                           output_dir=output_dir, seed=seed, topk=topk)
 
         if n_jobs == 1:
             self.optimizer = TPE(objective_function=self.evaluator,
                                  config_space=config_space,
                                  advisor_type='tpe',
                                  task_id='Default',
-                                 time_limit_per_trial=self.per_run_time_limit,
+                                 max_runtime_per_trial=self.per_run_time_limit,
                                  random_state=self.seed)
         else:
             raise ValueError('Openbox dose not support parallel TPE')
 
         self.trial_cnt = 0
-        self.configs = list()
-        self.perfs = list()
         self.exp_output = dict()
-        self.incumbent_perf = float("-INF")
-        self.incumbent_config = self.config_space.get_default_configuration()
 
         hp_num = len(self.config_space.get_hyperparameters())
         if hp_num == 0:
@@ -43,15 +39,11 @@ class TPEOptimizer(BaseOptimizer):
 
         self.logger.debug("The maximum trial number in HPO is :%d" % self.config_num_threshold)
         self.maximum_config_num = min(600, self.config_num_threshold)
-        self.eval_dict = {}
         self.n_jobs = n_jobs
 
     def run(self):
         while True:
-            evaluation_num = len(self.perfs)
-            if self.evaluation_num_limit is not None and evaluation_num > self.evaluation_num_limit:
-                break
-            if self.time_limit is not None and time.time() - self.start_time > self.time_limit:
+            if self.early_stopped_flag or self.timeout_flag:
                 break
             self.iterate()
         return np.max(self.perfs)
@@ -75,7 +67,8 @@ class TPEOptimizer(BaseOptimizer):
                 if time.time() - _start_time > budget:
                     self.logger.warning('Time limit exceeded!')
                     break
-                _config, _status, _, _perf = self.optimizer.iterate()
+                obs = self.optimizer.iterate()
+                _config, _status, _perf = obs.config, obs.trial_state, obs.objectives
                 self.update_saver([_config], [_perf[0]])
                 if _status == SUCCESS:
                     self.exp_output[time.time()] = (_config, _perf[0])
@@ -85,22 +78,28 @@ class TPEOptimizer(BaseOptimizer):
             raise ValueError('Openbox dose not support parallel TPE')
 
         run_history = self.optimizer.get_history()
-        if self.name == 'hpo':
+        if self.name in ['hpo', 'cash', 'cashfe']:
             if hasattr(self.evaluator, 'fe_config'):
                 fe_config = self.evaluator.fe_config
             else:
                 fe_config = None
-            self.eval_dict = {(fe_config, hpo_config): [-run_history.perfs[i], time.time(), run_history.trial_states[i]]
+            self.eval_dict = {(fe_config, hpo_config): [-run_history.objectives[i][0], time.time(), run_history.trial_states[i]]
                               for i, hpo_config in enumerate(run_history.configurations)}
         else:
             if hasattr(self.evaluator, 'hpo_config'):
                 hpo_config = self.evaluator.hpo_config
             else:
                 hpo_config = None
-            self.eval_dict = {(fe_config, hpo_config): [-run_history.perfs[i], time.time(), run_history.trial_states[i]]
-                              for i, fe_config in enumerate(run_history.configurationsa)}
+            self.eval_dict = {(fe_config, hpo_config): [-run_history.objectives[i][0], time.time(), run_history.trial_states[i]]
+                              for i, fe_config in enumerate(run_history.configurations)}
         if len(run_history.get_incumbents()) > 0:
-            self.incumbent_config, self.incumbent_perf = run_history.get_incumbents()[0]
+            incumbent = run_history.get_incumbents()[0]
+            self.incumbent_config, self.incumbent_perf = incumbent.config, incumbent.objectives[0]
             self.incumbent_perf = -self.incumbent_perf
         iteration_cost = time.time() - _start_time
+
+        if self.time_limit is not None and time.time() - self.timestamp > self.time_limit or \
+                self.evaluation_num_limit is not None and len(self.perfs) >= self.evaluation_num_limit:
+            self.timeout_flag = True
+
         return self.incumbent_perf, iteration_cost, self.incumbent_config

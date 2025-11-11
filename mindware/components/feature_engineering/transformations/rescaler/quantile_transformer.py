@@ -36,12 +36,15 @@ class QuantileTransformation(Transformer):
         return _X
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
+        n_samples = kwargs.get('n_samples', None)
+        n_quantiles_upper = min(2000, n_samples) if n_samples is not None else 2000
+        
         if optimizer == 'smac':
             cs = ConfigurationSpace()
             # TODO parametrize like the Random Forest as n_quantiles = n_features^param
             n_quantiles = UniformIntegerHyperparameter(
-                'n_quantiles', lower=10, upper=2000, default_value=1000
+                'n_quantiles', lower=10, upper=n_quantiles_upper, default_value=min(1000, n_quantiles_upper)
             )
             output_distribution = CategoricalHyperparameter(
                 'output_distribution', ['uniform', 'normal'], default_value="uniform"

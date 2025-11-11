@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.model_selection import StratifiedKFold, KFold, StratifiedShuffleSplit, ShuffleSplit
 
 from mindware.components.utils.balancing import smote
+import torch.nn as nn
 
 
 def get_onehot_y(encoder, y):
@@ -15,6 +16,8 @@ def cross_validation(estimator, scorer, X, y, n_fold=5, shuffle=True, fit_params
     with warnings.catch_warnings():
         # ignore all caught warnings
         warnings.filterwarnings("ignore")
+        if not shuffle:
+            random_state = None
         if if_stratify:
             kfold = StratifiedKFold(n_splits=n_fold, random_state=random_state, shuffle=shuffle)
         else:
@@ -108,6 +111,10 @@ def validation(estimator, scorer, X_train, y_train, X_val, y_val, fit_params=Non
                 _fit_params['sample_weight'] = fit_params['sample_weight']
             elif 'data_balance' in fit_params:
                 X_train, y_train = smote(X_train, y_train)
+
+        if estimator.get_properties()['shortname'] == 'NN':
+            _fit_params['X_val'] = X_val
+            _fit_params['Y_val'] = y_val
         estimator.fit(X_train, y_train, **_fit_params)
         if onehot is not None:
             y_val = get_onehot_y(onehot, y_val)

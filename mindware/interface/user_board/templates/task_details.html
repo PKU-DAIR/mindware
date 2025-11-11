@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Mindware</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="all,follow">
+    <link rel="stylesheet" href="/static/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/vendor/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/static/css/style.default.css" id="theme-stylesheet">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        /* 设置目录栏的宽度和背景色 */
+        .sidebar {
+            height: 100%;
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+
+        @font-face {
+            font-family: 'Courgette';
+            src: url("/static/vendor/google-fonts/Courgette-Regular.ttf") format('truetype');
+        }
+
+        /* 设置目录栏中链接的样式 */
+        .sidebar h2 {
+            font-family: 'Courgette', cursive; /* 使用 Pacifico 字体 */
+            font-weight: bold;
+            padding: 10px;
+            text-decoration: none;
+            text-align: center; /* 让链接文本居中 */
+            font-size: 45px; /* 设置字体大小 */
+            color: #333; /* 设置字体颜色 */
+        }
+
+        .sidebar a {
+            font-weight: bold;
+            display: block;
+            padding: 10px;
+            text-decoration: none;
+            text-align: center; /* 让链接文本居中 */
+            font-size: 30px; /* 设置字体大小 */
+            color: #333; /* 设置字体颜色 */
+        }
+
+        /* 设置目录栏中链接的 hover 效果 */
+        .sidebar a:hover {
+            background-color: #ddd;
+        }
+
+        /* 设置内容区域的左边距，使其腾出目录栏的宽度 */
+        .content {
+            margin-left: 250px;
+            padding: 20px;
+        }
+    </style>
+</head>
+
+<body>
+<!-- 弹窗模态框 -->
+<div class="modal" id="myModal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <!-- 模态框头部 -->
+            <div class="modal-header">
+                <h4 class="modal-title">提示</h4>
+                <button type="button" class="btn-close" onclick="$('#myModal').modal('hide');"></button>
+            </div>
+            <!-- 模态框主体 -->
+            <div class="modal-body">
+                <p id="message"></p>
+            </div>
+            <!-- 模态框底部 -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="$('#myModal').modal('hide');">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 左侧目录栏 -->
+<div class="sidebar">
+    <h2>Mindware</h2>
+    <ul class="list-unstyled">
+        <li><a href="/user_board/history">History</a></li>
+        <li><a href="/user_board/new_task">New Task</a></li>
+    </ul>
+</div>
+
+<!-- 主内容区 -->
+<div class="content">
+
+    <!-- pipeline detail modal -->
+    <div class="modal fade bs-example-modal-lg" id="config-modal" tabindex="-1" role="dialog" aria-labelledby="myModalLable"
+        aria-hidden="true">
+        <!--modal start -->
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="myModalLabel_1">Config List</h4>
+                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id='rh_config_div' style="font-size: 18px">
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h1>Details</h1>
+
+    <div class="container">
+        <table id="taskTable" class="table table-striped" style="display: block; font-size: 20px">
+            <thead>
+            <tr>
+                <th>Task ID</th>
+                <th>Task Type</th>
+                <th>Opt Type</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Task Info</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td>{{task_id}}</td>
+                <td>{{task_type}}</td>
+                <td>{{opt_type}}</td>
+                <td>{{task_start_time}}</td>
+                <td>{{task_end_time}}</td>
+                <td>{{task_info}}</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="row d-flex justify-content-center">
+        <div class="col-md-4  col-lg-8 " id="line" style="height: 400px; width: 100px"></div>
+
+    </div>
+
+    <div class="d-flex justify-content-center">
+        <div class="tab-pane col-md-4  col-lg-8" id="history" role="tabpanel"  style="font-size: 18px">
+            <table id="history_table" class="table table-striped" >
+                <thead>
+                    <tr>
+                        <th>Index</th>
+                        <th>Objectives</th>
+                        <th>Configuration</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for observation in observations %}
+                    <tr>
+                        <td>{{observation.idx}}</td>
+                        <td>{{observation.performance}}</td>
+                        <td>{{observation.config_str}} <a style="color:#4fbfa8;cursor:pointer;" id="show_config" onclick="show_config('{{ observation.configuration }}')"><strong>...</strong></a></td>
+                        <td>{{observation.time_consumed}}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script src="/static/vendor/jquery/jquery.js"></script>
+<script src="/static/vendor/jquery/jquery.md5.js"></script>
+<script src="/static/vendor/jquery.cookie/jquery.cookie.js"></script>
+<script src="/static/vendor/bootstrap/js/bootstrap.min.js"></script>
+<script src='/static/vendor/datatables/js/datatables.js'></script>
+<script src='/static/js/echarts.min.js'></script>
+<script src='/static/js/echarts-gl.min.js'></script>
+<!--<script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>-->
+<!--<script src="https://cdn.jsdelivr.net/npm/echarts-gl/dist/echarts-gl.min.js"></script>-->
+<script src="/static/js/common.js"></script>
+
+<!-- 你的其他 JavaScript 代码 -->
+<script>
+
+    // 输出performances，并将其转化为JavaScript对象
+    var performances = JSON.parse("{{ performances }}")
+
+    function show_config(rh_config) {
+        $('#rh_config_div').html('');
+        $('#rh_config_div').append("<pre>" + JSON.stringify(JSON.parse(rh_config), null, 2) + "</pre>")
+        $('#config-modal').modal('show');
+    }
+
+    var mydataZoom = [
+            {
+                type: 'slider',
+                xAxisIndex: 0,
+                start: 0,
+                end: 100
+            },
+            {
+                type: 'inside',
+                xAxisIndex: 0,
+                start: 0,
+                end: 100
+            },
+            {
+                type: 'slider',
+                orient: 'vertical',
+                yAxisIndex: 0,
+                start: 0,
+                end: 100
+            },
+            {
+                type: 'inside',
+                orient: 'vertical',
+                yAxisIndex: 0,
+                start: 0,
+                end: 100
+            },
+
+        ]
+
+
+    // initialize Line Chart
+    var line_chart = echarts.init($('#line')[0]);
+    var line_option = {
+        title:{
+            text: 'Min Objective Value',
+        },
+        dataZoom: mydataZoom,
+        legend: {
+            left: 10,
+            top: 50,
+            'selected': {},
+            selectedMode: 'single'
+        },
+        grid:{
+            top: 90
+        },
+        xAxis: {
+
+            name: 'Iterations',
+            boundaryGap: false,
+            nameLocation: 'center',
+            nameRotate: '0',
+            nameTextStyle: {
+                padding: [20, 0, 0, 0],
+                fontSize: 16
+            },
+            splitLine: {
+                show: false,
+                // lineStyle: {
+                //     color: ['black'],
+                //     width: 1,
+                //     type: 'solid'
+                // }
+            },
+            interval: 1,        // 设置刻度间隔为1
+            minInterval: 1,     // 设置最小刻度间隔为1，确保只显示整数
+        },
+        yAxis: {
+            type: 'value',
+            name: 'Min objective value',
+            nameLocation: 'center',
+            nameRotate: '90',
+            nameTextStyle: {
+                padding: [0, 0, 50, 50],
+                fontSize: 16
+            },
+            splitLine: {
+                show: true,
+                // lineStyle: {
+                //     color: ['black'],
+                //     width: 1,
+                //     type: 'solid'
+                // }
+            }
+        },
+        series: [
+            {
+                name: 'validation',
+                type: 'line',
+                data: performances,
+                smooth: true,
+                symbol: 'circle',
+                symbolSize: '10',
+                lineStyle: {
+                    width: 2
+                }
+            }
+        ]
+
+    };
+
+    line_option && line_chart.setOption(line_option);
+
+    var history_table = $('#history_table').DataTable({
+        "aaSorting": [],
+        "destroy": true,
+        "searching": false
+    });
+
+    history_table.draw()
+
+</script>
+
+</body>
+
+</html>

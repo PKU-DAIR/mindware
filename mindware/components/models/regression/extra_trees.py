@@ -1,5 +1,6 @@
 import time
-
+import sklearn
+from packaging.version import parse as V
 from ConfigSpace.configuration_space import ConfigurationSpace
 from ConfigSpace.hyperparameters import UniformFloatHyperparameter, \
     UniformIntegerHyperparameter, CategoricalHyperparameter, \
@@ -16,6 +17,7 @@ class ExtraTreesRegressor(IterativeComponentWithSampleWeight, BaseRegressionMode
                  min_samples_split, max_features, bootstrap, max_leaf_nodes,
                  max_depth, min_weight_fraction_leaf, min_impurity_decrease,
                  oob_score=False, n_jobs=1, random_state=None, verbose=0):
+        BaseRegressionModel.__init__(self)
         self.n_estimators = self.get_max_iter()
         self.criterion = criterion
 
@@ -102,11 +104,30 @@ class ExtraTreesRegressor(IterativeComponentWithSampleWeight, BaseRegressionMode
                 'output': (PREDICTIONS,)}
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
+        meta_mask = kwargs.get('meta', False)
+        y_neg_mask = kwargs.get('y_neg_mask', True) | meta_mask
+
+        SKLEARN_VERSION = V(sklearn.__version__)
+
         if optimizer == 'smac':
             cs = ConfigurationSpace()
-            criterion = CategoricalHyperparameter(
-                "criterion", ["mse", "mae"], default_value="mse")
+            if SKLEARN_VERSION < V("1.0.2"):
+                criterion = CategoricalHyperparameter(
+                    "criterion", ["mse", "mae"], default_value="mse")
+            elif SKLEARN_VERSION <= V("1.2.2"):
+                criterion = CategoricalHyperparameter(
+                    "criterion", ["squared_error", "absolute_error"], default_value="squared_error")
+            elif SKLEARN_VERSION <= V("1.8"):
+                if y_neg_mask:
+                    criterion = CategoricalHyperparameter(
+                        "criterion", ["squared_error", "absolute_error", "friedman_mse", "poisson"], default_value="squared_error")
+                else:
+                    criterion = CategoricalHyperparameter(
+                        "criterion", ["squared_error", "absolute_error", "friedman_mse"], default_value="squared_error")
+            else:
+                raise RuntimeError("Unsupported sklearn version: {}".format(sklearn.__version__))
+
 
             # The maximum number of features used in the forest is calculated as m^max_features, where
             # m is the total number of features, and max_features is the hyperparameter specified below.
@@ -125,8 +146,7 @@ class ExtraTreesRegressor(IterativeComponentWithSampleWeight, BaseRegressionMode
             max_leaf_nodes = UnParametrizedHyperparameter("max_leaf_nodes", "None")
             min_impurity_decrease = UnParametrizedHyperparameter('min_impurity_decrease', 0.0)
 
-            bootstrap = CategoricalHyperparameter(
-                "bootstrap", ["True", "False"], default_value="False")
+            bootstrap = CategoricalHyperparameter("bootstrap", ["True", "False"], default_value="False")
             cs.add_hyperparameters([criterion, max_features,
                                     max_depth, min_samples_split, min_samples_leaf,
                                     min_weight_fraction_leaf, max_leaf_nodes,
@@ -135,7 +155,15 @@ class ExtraTreesRegressor(IterativeComponentWithSampleWeight, BaseRegressionMode
             return cs
         elif optimizer == 'tpe':
             from hyperopt import hp
-            space = {'criterion': hp.choice('et_criterion', ["mse", "mae"]),
+
+            if sklearn.__version__ < "1.0.2":
+                criterions = ["mse", "mae"]
+            elif sklearn.__version__ < "1.2.2":
+                criterions = ["squared_error", "absolute_error"]
+            else:
+                criterions = ["squared_error", "absolute_error", "friedman_mse", "poisson"]
+
+            space = {'criterion': hp.choice('et_criterion', criterions),
                      'max_features': hp.uniform('et_max_features', 0, 1),
                      'min_samples_split': hp.randint('et_min_samples_split', 19) + 2,
                      'min_samples_leaf': hp.randint('et_min_samples_leaf,', 20) + 1,

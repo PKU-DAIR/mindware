@@ -44,7 +44,6 @@ def parse_config(data_node: DataNode, config: dict, record=False, skip_balance=F
 
     _node = data_node.copy_()
     tran_dict = dict()
-
     # Image preprocessor
     if image_pre_id:
         _node, image_tran = tran_operate(image_pre_id, _image_preprocessor, config_dict, _node)
@@ -79,7 +78,7 @@ def parse_config(data_node: DataNode, config: dict, record=False, skip_balance=F
             _node, tran = tran_operate(op_id, thirdparty_candidates_dict[stage], config_dict, _node)
 
         tran_dict[stage] = tran
-
+        
     _node.config = config
     if record:
         return _node, tran_dict
@@ -96,5 +95,6 @@ def construct_node(data_node: DataNode, tran_dict, mode='test'):
     for stage in stage_list:
         if stage_list == 'balancer' and mode == 'test':
             continue
-        data_node = tran_dict[stage].operate(data_node)
+        if stage in tran_dict:
+            data_node = tran_dict[stage].operate(data_node)
     return data_node

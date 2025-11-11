@@ -2,7 +2,9 @@ from ConfigSpace.configuration_space import ConfigurationSpace
 from ConfigSpace.hyperparameters import UniformFloatHyperparameter, \
     UniformIntegerHyperparameter, CategoricalHyperparameter, \
     UnParametrizedHyperparameter, Constant
+from packaging.version import parse as V
 import numpy as np
+import sklearn
 
 from mindware.components.models.base_model import BaseRegressionModel, IterativeComponentWithSampleWeight
 from mindware.components.utils.constants import *
@@ -19,6 +21,7 @@ class RandomForest(
                  max_depth, min_samples_split, min_samples_leaf,
                  min_weight_fraction_leaf, bootstrap, max_leaf_nodes,
                  min_impurity_decrease, random_state=None, n_jobs=1):
+        BaseRegressionModel.__init__(self)
         self.n_estimators = self.get_max_iter()
         self.criterion = criterion
         self.max_features = max_features
@@ -121,11 +124,25 @@ class RandomForest(
                 'output': (PREDICTIONS,)}
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
+        meta_mask = kwargs.get('meta', False)
+        y_neg_mask = kwargs.get('y_neg_mask', True) | meta_mask
+
+        SKLEARN_VERSION = V(sklearn.__version__)
+        sub = ['poisson'] if y_neg_mask else []
         if optimizer == 'smac':
             cs = ConfigurationSpace()
-            criterion = CategoricalHyperparameter(
-                "criterion", ["mse", "mae"], default_value="mse")
+            if SKLEARN_VERSION < V("1.0.2"):
+                criterion = CategoricalHyperparameter(
+                    "criterion", ["mse", "mae"], default_value="mse")
+            elif SKLEARN_VERSION < V("1.2.2"):
+                criterion = CategoricalHyperparameter(
+                    "criterion", ["squared_error", "absolute_error"] + sub, default_value="squared_error")
+            elif SKLEARN_VERSION <= V("1.8"):
+                criterion = CategoricalHyperparameter(
+                    "criterion", ["squared_error", "absolute_error", "friedman_mse"] + sub, default_value="squared_error")
+            else:
+                raise RuntimeError("Unsupported sklearn version: {}".format(sklearn.__version__))
 
             # The maximum number of features used in the forest is calculated as m^max_features, where
             # m is the total number of features, and max_features is the hyperparameter specified below.
@@ -150,8 +167,15 @@ class RandomForest(
                                     bootstrap, min_impurity_decrease])
             return cs
         elif optimizer == 'tpe':
+            if sklearn.__version__ < "1.0.2":
+                criterions = ["mse", "mae"]
+            elif sklearn.__version__ < "1.2.2":
+                criterions = ["squared_error", "absolute_error", "poisson"]
+            else:
+                criterions = ["squared_error", "absolute_error", "friedman_mse", "poisson"]
+
             from hyperopt import hp
-            space = {'criterion': hp.choice('rf_criterion', ["mse", "mae"]),
+            space = {'criterion': hp.choice('rf_criterion', criterions),
                      'max_features': hp.uniform('rf_max_features', 0, 1),
                      'max_depth': hp.choice('rf_max_depth', [None]),
                      'min_samples_split': hp.randint('rf_min_samples_split', 19) + 2,

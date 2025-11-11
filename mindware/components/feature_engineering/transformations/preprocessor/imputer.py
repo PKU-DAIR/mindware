@@ -27,7 +27,8 @@ class ImputationTransformation(Transformer):
         X_output = X.copy()
         X_output[:, target_fields] = new_X
         new_feature_types = input_datanode.feature_types.copy()
-        output_datanode = DataNode((X_output, y), new_feature_types, input_datanode.task_type)
+        new_feature_map = input_datanode.feature_map.copy()
+        output_datanode = DataNode((X_output, y), new_feature_types, input_datanode.task_type, feature_map=new_feature_map)
         output_datanode.trans_hist = input_datanode.trans_hist.copy()
         output_datanode.trans_hist.append(self.type)
 

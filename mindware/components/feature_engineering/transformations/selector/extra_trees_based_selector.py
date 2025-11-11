@@ -4,6 +4,7 @@ from ConfigSpace.hyperparameters import UniformFloatHyperparameter, \
     UnParametrizedHyperparameter, Constant
 from mindware.components.feature_engineering.transformations.base_transformer import *
 from mindware.components.utils.configspace_utils import check_none, check_for_bool
+import sklearn
 
 
 class ExtraTreeBasedSelector(Transformer):
@@ -20,9 +21,7 @@ class ExtraTreeBasedSelector(Transformer):
 
         self.n_estimators = n_estimators
         self.estimator_increment = 10
-        if criterion not in ("gini", "entropy"):
-            raise ValueError("'criterion' is not in ('gini', 'entropy'): "
-                             "%s" % criterion)
+
         self.criterion = criterion
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_split = min_samples_split
@@ -99,9 +98,15 @@ class ExtraTreeBasedSelector(Transformer):
         selected_types = [feature_types[idx] for idx in target_fields if is_selected[idx]]
         selected_types.extend(irrevalent_types)
 
+
+        #for data map
+        origin_feature_map = input_datanode.feature_map
+        new_feature_map = [origin_feature_map[idx] for idx in irrevalent_fields] 
+        new_feature_map += [origin_feature_map[idx] for idx in target_fields if is_selected[idx]]
+
         new_X = np.hstack((_X, X[:, irrevalent_fields]))
         new_feature_types = selected_types
-        output_datanode = DataNode((new_X, y), new_feature_types, input_datanode.task_type)
+        output_datanode = DataNode((new_X, y), new_feature_types, input_datanode.task_type, feature_map=new_feature_map)
         output_datanode.trans_hist = input_datanode.trans_hist.copy()
         output_datanode.trans_hist.append(self.type)
         output_datanode.enable_balance = input_datanode.enable_balance
@@ -111,12 +116,20 @@ class ExtraTreeBasedSelector(Transformer):
         return output_datanode
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         if optimizer == 'smac':
             cs = ConfigurationSpace()
             n_estimators = Constant("n_estimators", 100)
-            criterion = CategoricalHyperparameter(
-                "criterion", ["gini", "entropy"], default_value="gini")
+
+            if sklearn.__version__ < "1.1.3":
+                criterion = CategoricalHyperparameter(
+                    "criterion", ["gini", "entropy"], default_value="gini")
+            elif '1.1.3' <= sklearn.__version__ <= '1.3.2':
+                criterion = CategoricalHyperparameter(
+                    "criterion", ["gini", "entropy", "log_loss"], default_value="gini")
+            else:
+                raise ValueError("sklearn version %s is not supported." % sklearn.__version__)
+
             max_features = UniformFloatHyperparameter("max_features", 0, 1,
                                                       default_value=0.5, q=0.05)
 

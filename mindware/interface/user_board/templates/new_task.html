@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Mindware</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="all,follow">
+    <link rel="stylesheet" href="/static/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/vendor/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/static/css/style.default.css" id="theme-stylesheet">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        /* 设置目录栏的宽度和背景色 */
+        .sidebar {
+            height: 100%;
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+
+        @font-face {
+            font-family: 'Courgette';
+            src: url("/static/vendor/google-fonts/Courgette-Regular.ttf") format('truetype');
+        }
+
+        /* 设置目录栏中链接的样式 */
+        .sidebar h2 {
+            font-family: 'Courgette', cursive; /* 使用 Pacifico 字体 */
+            font-weight: bold;
+            padding: 10px;
+            text-decoration: none;
+            text-align: center; /* 让链接文本居中 */
+            font-size: 45px; /* 设置字体大小 */
+            color: #333; /* 设置字体颜色 */
+        }
+
+        .sidebar a {
+            font-weight: bold;
+            display: block;
+            padding: 10px;
+            text-decoration: none;
+            text-align: center; /* 让链接文本居中 */
+            font-size: 30px; /* 设置字体大小 */
+            color: #333; /* 设置字体颜色 */
+        }
+
+        /* 设置目录栏中链接的 hover 效果 */
+        .sidebar a:hover {
+            background-color: #ddd;
+        }
+
+        /* 设置内容区域的左边距，使其腾出目录栏的宽度 */
+        .content {
+            margin-left: 250px;
+            padding: 20px;
+        }
+        .my_container {
+            width: auto;
+            padding-right: 15px;
+            padding-left: 30px;
+            margin-right: auto;
+            margin-left: auto;
+        }
+        .form-option-label,
+        .for-taskid-label,
+        .for-taskType-label,
+        .for-optType-label,
+        .for-can-label,
+        .for-file-label,
+        .for-itrs-label,
+        .for-evalType-label,
+        .for-optimizer-label,
+        .for-metric-label {
+            font-size: 20px;
+        }
+
+        input[type="checkbox"],
+        input[type="radio"]{
+          width: 20px; /* 设置宽度 */
+          height: 20px; /* 设置高度 */
+        }
+
+        select {
+            width: 150px;
+            height: 30px;
+        }
+
+    </style>
+</head>
+
+<body>
+
+<!-- 弹窗模态框 -->
+<div class="modal" id="myModal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <!-- 模态框头部 -->
+            <div class="modal-header">
+                <h4 class="modal-title">Tips</h4>
+                <button type="button" class="btn-close" onclick="$('#myModal').modal('hide');">&times;</button>
+            </div>
+            <!-- 模态框主体 -->
+            <div class="modal-body">
+                <p id="message"></p>
+            </div>
+            <!-- 模态框底部 -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="$('#myModal').modal('hide');">close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 左侧目录栏 -->
+<div class="sidebar">
+    <h2>Mindware</h2>
+    <ul class="list-unstyled">
+        <li><a href="/user_board/history">History</a></li>
+        <li><a href="/user_board/new_task">New Task</a></li>
+    </ul>
+</div>
+
+<div class="content">
+    <!-- 主内容区 -->
+    <h2>New Task</h2>
+    <form id="taskForm" action="/user_board/test_add/" method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <!-- 输入框指定任务id -->
+        <div>
+            <label class="for-taskid-label" for="taskId">Task ID: </label>
+            <input type="text" id="taskId" name="taskId" style="font-size: 18px" value="test">
+        </div>
+
+        <div>
+            <label class="for-file-label" for="dataFile">Selct CSV File</label>
+            <input type="file" id="dataFile" name="dataFile" accept=".csv" >
+        </div>
+
+        <!-- 下拉框选择任务类型 -->
+        <div>
+            <label class="for-taskType-label" for="taskType">Task Type: </label>
+            <select id="taskType" name="taskType" style="font-size: 18px;">
+                <option value="classification" style="font-size: 18px;">Classification</option>
+                <option value="regression" style="font-size: 18px;">Regression</option>
+            </select>
+        </div>
+
+        <hr>
+
+        <!-- 下拉框选择调参类型 -->
+        <div>
+            <label class="for-optType-label" for="optType">Optimization Type: </label>
+            <select id="optType" name="optType" style="font-size: 18px;">
+                <option value="HPO" style="font-size: 18px;">HPO</option>
+                <option value="FE" style="font-size: 18px;">FE</option>
+                <option value="CASH" style="font-size: 18px;">CASH</option>
+                <option value="CASHFE" style="font-size: 18px;">CASHFE</option>
+            </select>
+        </div>
+
+        <!-- 输入框指定迭代轮数 -->
+        <div style="display: flex">
+
+            <div>
+                <label class="for-optimizer-label" for="optimizer">Optimization Type: </label>
+                <select id="optimizer" name="optimizer" style="font-size: 18px; width: 200px;">
+                    <option value="smac" style="font-size: 18px;">SMAC</option>
+                    <option value="random_search" style="font-size: 18px;">Random Search</option>
+                    <option value="tpe" style="font-size: 18px;">TPE</option>
+                </select>
+            </div>
+
+            <div style="margin-left: 30px">
+                <label class="for-itrs-label" for="itrs">Iteration Epochs: </label>
+                <input type="number" id="itrs" name="itrs" style="width: 80px; font-size: 18px" value="3">
+            </div>
+
+        </div>
+
+        <div style="display: flex">
+
+            <div >
+                <label class="for-metric-label" for="metric">Metric: </label>
+                <select id="metric" name="metric" style="font-size: 18px; width: 200px;">
+                </select>
+            </div>
+
+            <div style="margin-left: 30px">
+                <label class="for-evalType-label" for="evalType">Optimization Type: </label>
+                <select id="evalType" name="evalType" style="font-size: 18px; width: 200px;">
+                    <option value="holdout" style="font-size: 18px;">holdout</option>
+                    <option value="cv" style="font-size: 18px;">cross-val</option>
+                    <option value="partial" style="font-size: 18px;">partial</option>
+                    <option value="partial_bohb" style="font-size: 18px;">partial-bohb</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 复选框选择选项 -->
+        <div>
+            <div style="display: flex">
+                <label class="for-can-label">Candidate Models: </label><br>
+
+                <div class="form-check" id="selectAll-div" style="margin-left: 30px">
+                    <input type="checkbox" id="selectAll" onclick="select_all(this)">
+                    &nbsp;
+                    <label for="selectAll" style="font-size: 20px">
+                        select all
+                    </label>
+                </div>
+            </div>
+            <!-- 复选框选择模型 -->
+            <div id="modelOptions">
+                <div class="my_container" id="models_container">
+
+                </div>
+                <!-- 模型选项会根据任务类型动态生成 -->
+            </div>
+
+        </div>
+
+
+        <!-- 提交按钮 -->
+        <button type="button" id="submitBtn" style="width: 80px; height: 40px; font-size: 20px; margin-top: 15px; margin-left: 50px">submit</button>
+
+        <div class="container" id="process-bar-div" style="margin-top: 30px; display: none;">
+            <h2>Progress</h2>
+            <div class="progress" style="height: 30px">
+                <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%; font-size: 25px" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script src="/static/vendor/jquery/jquery.js"></script>
+<script src="/static/vendor/jquery/jquery.md5.js"></script>
+<script src="/static/vendor/jquery.cookie/jquery.cookie.js"></script>
+<script src="/static/vendor/bootstrap/js/bootstrap.min.js"></script>
+<script src="/static/js/common.js"></script>
+
+<!-- 你的其他 JavaScript 代码 -->
+<script>
+
+    function select_all(source) {
+        var checkboxes = document.querySelectorAll('input[type="checkbox"].candi');
+
+        for (var i = 0; i < checkboxes.length; i++) {
+            if (checkboxes[i] != source) { // 防止自身触发
+                checkboxes[i].checked = source.checked;
+            }
+        }
+    }
+
+    <!-- ------------------------------------------------- 根据任务类型(cls/rgs) 和 优化类型(HPO/FE/CASH/CASHFE) 决定候选模型 ---------------------------------------------- -->
+
+    // 更新模型选项
+    const classificationModels = ['adaboost', 'extra_trees', 'gradient_boosting', 'k_nearest_neighbors', 'lda', 'liblinear_svc', 'libsvm_svc', 'lightgbm', 'logistic_regression', 'qda', 'random_forest'];
+    const regressionModels = ['adaboost', 'extra_trees', 'gradient_boosting', 'k_nearest_neighbors', 'lasso_regression', 'liblinear_svr', 'libsvm_svr', 'lightgbm', 'random_forest', 'ridge_regression'];
+    function updateModelOptions() {
+        var optType = document.getElementById('optType').value;
+        var taskType = document.getElementById('taskType').value;
+        var models = taskType === 'classification' ? classificationModels : regressionModels;
+        var inputType = ['HPO', 'FE'].includes(optType) ? 'radio' : 'checkbox';
+
+        // 多选框才提供全选按钮
+        if (inputType === 'checkbox') {
+            document.getElementById('selectAll-div').style.display = 'block';
+        } else {
+            document.getElementById('selectAll-div').style.display = 'none';
+        }
+
+        var modelOptionsDiv = document.getElementById('models_container');
+        modelOptionsDiv.innerHTML = ''; // 清空模型选项
+
+        var rowElement = document.createElement('div');
+        rowElement.className = "row";
+
+        models.forEach(function(model, index) {
+            var colElement = document.createElement('div');
+            colElement.className = "col-md-3";
+            var divElement = document.createElement('div');
+            divElement.className = 'form-option';
+
+            // 创建 input 元素
+            var inputElement = document.createElement('input');
+            inputElement.name = 'options';
+            inputElement.type = inputType;
+            inputElement.className = 'form-option-input candi';
+            inputElement.id = inputType + (index+1).toString();
+            inputElement.value = model;
+
+            // 创建 label 元素
+            var labelElement = document.createElement('label');
+            labelElement.className = 'form-option-label';
+            labelElement.htmlFor = inputType + (index+1).toString();
+            labelElement.textContent = model;
+
+            // 将 input 元素和 label 元素添加到 div 元素中
+            divElement.appendChild(inputElement);
+            divElement.innerHTML += '&nbsp;&nbsp;';
+            divElement.appendChild(labelElement);
+            colElement.appendChild(divElement);
+
+            rowElement.appendChild(colElement);
+            if (index % 3 == 2 || index == models.length - 1) {
+                modelOptionsDiv.appendChild(rowElement);
+                rowElement = document.createElement('div');
+                rowElement.className = "row";
+            }
+        });
+    }
+
+    // 更新Optimizer是否加入mab
+    function updateOptimizer() {
+        var optType = document.getElementById('optType').value;
+        var optimizerElement = document.getElementById('optimizer');
+
+        // 如果输入框1的值为 'show'，则向选择框中添加选项
+        if (['CASH', 'CASHFE'].includes(optType)) {
+            var option = document.createElement('option');
+            option.text = 'MAB';
+            option.value = 'mab';
+            optimizerElement.add(option);
+        } else {
+            // 否则，移除名为 'dynamic' 的选项
+            var dynamicOption = optimizerElement.querySelector('option[value="mab"]');
+            if (dynamicOption) {
+                dynamicOption.remove();
+            }
+        }
+    }
+
+    // 更新metric选项
+    const classificationMetrics = ['accuracy', "balanced_accuracy", 'f1', 'precision', 'recall', 'auc', 'cross_entropy'];
+    const regressionMetrics = ['adaboost', 'extra_trees', 'gradient_boosting', 'k_nearest_neighbors', 'lasso_regression', 'liblinear_svr', 'libsvm_svr', 'lightgbm', 'random_forest', 'ridge_regression'];
+    function updateMetricOptions() {
+        var taskType = document.getElementById('taskType').value;
+        var metricElement = document.getElementById('metric');
+        metricElement.innerHTML = ''; // 清空metric选项
+
+        var metrics = taskType === 'classification' ? classificationMetrics : regressionMetrics;
+
+        metrics.forEach(function(metric) {
+            var option = document.createElement('option');
+            option.text = metric;
+            option.value = metric;
+            metricElement.add(option);
+        });
+    }
+
+    // 页面加载时更新模型选项和metric选项
+    updateModelOptions();
+    updateMetricOptions();
+
+    // 监听任务类型下拉框变化事件，更新模型选项
+    document.getElementById('taskType').addEventListener('change', function () {
+        // 更新有哪些候选
+        updateModelOptions();
+        // 更新有哪些metric
+        updateMetricOptions();
+    });
+    document.getElementById('optType').addEventListener('change', function () {
+        // 更新候选模型是否是多选
+        updateModelOptions();
+        // 更新optimizer是否加入mab
+        updateOptimizer()
+    });
+
+    <!-- ------------------------------------------------------------------------------------------------------------- -->
+
+    document.getElementById("submitBtn").addEventListener("click", function () {
+        // 弹出确认框
+        var confirmation = confirm("确认提交表单数据吗？");
+        if (confirmation) {
+
+            $('#process-bar-div').css('display', 'block');
+
+            var sitv = setInterval(
+                function () {
+                    $.get('/user_board/show_process/', function (data) {
+                        // 更新进度条
+                        var processBar = $('#progress-bar');
+                        processBar.css('width', data.progress + '%');
+                        processBar.text(data.progress + '%');
+                        if (data.progress >= 99.99) {
+                            clearInterval(sitv);
+                        }
+                    })
+                }, 1000);
+
+
+            // 发送 Ajax 请求
+            var form = document.getElementById("taskForm");
+            var formData = new FormData(form);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/user_board/submit_task/', true);
+            xhr.onload = function() {
+                console.log(xhr.responseText);
+                var responseData = JSON.parse(xhr.responseText);
+                console.log(responseData)
+                if (responseData.status_code == 200) {
+                    // 请求成功，显示成功弹窗
+                    $('#message').text('Success！');
+                    $('#myModal').modal('show');
+                } else if (responseData.status_code == 400) {
+                    // 请求失败，显示失败弹窗
+                    $('#message').text('Failed：' + data.message);
+                    $('#myModal').modal('show');
+                }
+                else {
+                    // 请求失败，显示失败弹窗
+                    $('#message').text('Failed：' + data.message);
+                    $('#myModal').modal('show');
+                }
+            };
+            xhr.send(formData);
+
+
+        }
+    });
+
+</script>
+
+</body>
+
+</html>

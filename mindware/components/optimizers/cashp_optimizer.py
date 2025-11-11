@@ -279,7 +279,7 @@ class CashpOptimizer(object):
                 if dl_evaluator.continue_training:
                     for filename in os.listdir(dl_evaluator.model_dir):
                         # Temporary model
-                        if 'tmp_%s' % dl_evaluator.timestamp in filename:
+                        if 'tmp_%s' % dl_evaluator.datetime in filename:
                             try:
                                 filepath = os.path.join(dl_evaluator.model_dir, filename)
                                 os.remove(filepath)

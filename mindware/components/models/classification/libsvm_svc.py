@@ -14,6 +14,7 @@ from mindware.components.models.base_model import BaseClassificationModel
 class LibSVM_SVC(BaseClassificationModel):
     def __init__(self, C, kernel, gamma, shrinking, tol, max_iter,
                  class_weight=None, degree=3, coef0=0, random_state=None):
+        BaseClassificationModel.__init__(self)
         self.C = C
         self.kernel = kernel
         self.degree = degree
@@ -29,6 +30,9 @@ class LibSVM_SVC(BaseClassificationModel):
 
     def fit(self, X, Y):
         import sklearn.svm
+        from sklearn.utils.multiclass import unique_labels
+        self.classes_ = unique_labels(Y)
+
         # Nested kernel
         if isinstance(self.kernel, tuple):
             nested_kernel = self.kernel
@@ -53,7 +57,7 @@ class LibSVM_SVC(BaseClassificationModel):
         else:
             self.coef0 = float(self.coef0)
         self.tol = float(self.tol)
-        self.max_iter = float(self.max_iter)
+        self.max_iter = int(self.max_iter)
 
         self.shrinking = check_for_bool(self.shrinking)
 
@@ -98,7 +102,7 @@ class LibSVM_SVC(BaseClassificationModel):
                 'output': (PREDICTIONS,)}
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         if optimizer == 'smac':
             C = UniformFloatHyperparameter("C", 0.03125, 32768, log=True,
                                            default_value=1.0)

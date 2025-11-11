@@ -1,16 +1,17 @@
 import warnings
 from mindware.components.feature_engineering.transformations.base_transformer import *
 from ConfigSpace.configuration_space import ConfigurationSpace
-from ConfigSpace.hyperparameters import CategoricalHyperparameter, \
+from ConfigSpace.hyperparameters import CategoricalHyperparameter, Constant, \
     UniformIntegerHyperparameter
-from ConfigSpace.conditions import EqualsCondition
+from ConfigSpace.conditions import EqualsCondition, NotEqualsCondition
+from ConfigSpace.forbidden import ForbiddenAndConjunction, ForbiddenEqualsClause
 from mindware.components.utils.configspace_utils import check_for_bool, check_none
-
+import sklearn
 
 class FastIcaDecomposer(Transformer):
     type = 10
 
-    def __init__(self, algorithm='parallel', whiten='False', fun='logcosh', n_components=100,
+    def __init__(self, algorithm='parallel', whiten='False', fun='logcosh', n_components=None,
                  random_state=1):
         super().__init__("fast_ica")
         self.input_type = [NUMERICAL, DISCRETE, CATEGORICAL]
@@ -42,7 +43,12 @@ class FastIcaDecomposer(Transformer):
         if self.model is None:
             from sklearn.decomposition import FastICA
 
-            self.whiten = check_for_bool(self.whiten)
+            if sklearn.__version__ <= '1.0.2':
+                self.whiten = check_for_bool(self.whiten)
+            else:
+                if self.whiten == 'False':
+                    self.whiten = False
+
             if check_none(self.n_components):
                 self.n_components = None
             else:
@@ -69,19 +75,59 @@ class FastIcaDecomposer(Transformer):
         return X_new
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='samc'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
+        meta_mask = kwargs.get('meta', False)
+
+        # n_components cannot be larger than min(n_features, n_samples).
+        n_samples = kwargs.get('n_samples', None)
+        n_features = kwargs.get('n_features', None)
+        exp_deflation_mask = kwargs.get('exp_deflation_mask', True) | meta_mask
+        cube_parallel_mask = kwargs.get('cube_parallel_mask', True) | meta_mask
+
+        
+        n_components_lower = 1
+        n_components_upper = 2000
+        if not meta_mask:
+            n_components_lower = 10
+            if n_samples is not None:
+                n_components_upper = min(n_components_upper, n_samples)
+            if n_features is not None:
+                n_components_upper = min(n_components_upper, n_features)
+            
         if optimizer == 'smac':
             cs = ConfigurationSpace()
-            n_components = UniformIntegerHyperparameter(
-                "n_components", 10, 2000, default_value=100)
+            if n_components_upper <= 10:
+                n_components = Constant("n_components", n_components_upper)
+            else:
+                n_components = UniformIntegerHyperparameter(
+                    "n_components", n_components_lower, n_components_upper, default_value=min(100, n_components_upper))
             algorithm = CategoricalHyperparameter('algorithm',
                                                   ['parallel', 'deflation'], 'parallel')
-            whiten = CategoricalHyperparameter('whiten',
-                                               ['False', 'True'], 'False')
+            if sklearn.__version__ <= '1.0.2':
+                whiten = CategoricalHyperparameter('whiten',
+                                                   ['False', 'True'], 'False')
+            else:
+                whiten = CategoricalHyperparameter('whiten',
+                                                   ['False', 'unit-variance', 'arbitrary-variance'], 'unit-variance')
+
             fun = CategoricalHyperparameter(
                 'fun', ['logcosh', 'exp', 'cube'], 'logcosh')
             cs.add_hyperparameters([n_components, algorithm, whiten, fun])
-            cs.add_condition(EqualsCondition(n_components, whiten, "True"))
+            cs.add_condition(NotEqualsCondition(n_components, whiten, "False"))
+            if not exp_deflation_mask:
+                fun_and_algorithm = ForbiddenAndConjunction(
+                    ForbiddenEqualsClause(whiten, "False"),
+                    ForbiddenEqualsClause(fun, "exp"),
+                    ForbiddenEqualsClause(algorithm, "deflation"))
+                cs.add_forbidden_clause(fun_and_algorithm)
+                
+            if not cube_parallel_mask:
+                fun_and_algorithm = ForbiddenAndConjunction(
+                    ForbiddenEqualsClause(whiten, "False"),
+                    ForbiddenEqualsClause(fun, "cube"),
+                    ForbiddenEqualsClause(algorithm, "parallel"))
+                cs.add_forbidden_clause(fun_and_algorithm)
+            
             return cs
         elif optimizer == 'tpe':
             from hyperopt import hp

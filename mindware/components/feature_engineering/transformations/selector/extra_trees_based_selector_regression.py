@@ -4,6 +4,7 @@ from ConfigSpace.hyperparameters import UniformFloatHyperparameter, \
     UnParametrizedHyperparameter, Constant
 from mindware.components.feature_engineering.transformations.base_transformer import *
 from mindware.components.utils.configspace_utils import check_none, check_for_bool
+import sklearn
 
 
 class ExtraTreeBasedSelectorRegression(Transformer):
@@ -19,9 +20,7 @@ class ExtraTreeBasedSelectorRegression(Transformer):
 
         self.n_estimators = n_estimators
         self.estimator_increment = 10
-        if criterion not in ("mse", "friedman_mse", "mae"):
-            raise ValueError("'criterion' is not in ('mse', 'friedman_mse', "
-                             "'mae'): %s" % criterion)
+
         self.criterion = criterion
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_split = min_samples_split
@@ -100,9 +99,14 @@ class ExtraTreeBasedSelectorRegression(Transformer):
         selected_types = [feature_types[idx] for idx in target_fields if is_selected[idx]]
         selected_types.extend(irrevalent_types)
 
+        #for data map
+        origin_feature_map = input_datanode.feature_map
+        new_feature_map = [origin_feature_map[idx] for idx in irrevalent_fields] 
+        new_feature_map += [origin_feature_map[idx] for idx in target_fields if is_selected[idx]]
+
         new_X = np.hstack((_X, X[:, irrevalent_fields]))
         new_feature_types = selected_types
-        output_datanode = DataNode((new_X, y), new_feature_types, input_datanode.task_type)
+        output_datanode = DataNode((new_X, y), new_feature_types, input_datanode.task_type, feature_map=new_feature_map)
         output_datanode.trans_hist = input_datanode.trans_hist.copy()
         output_datanode.trans_hist.append(self.type)
         self.target_fields = target_fields.copy()
@@ -110,13 +114,32 @@ class ExtraTreeBasedSelectorRegression(Transformer):
         return output_datanode
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
+        meta_mask = kwargs.get('meta', False)
+
+        y_neg_mask = kwargs.get('y_neg_mask', True) | meta_mask
+        
         if optimizer == 'smac':
             cs = ConfigurationSpace()
 
             n_estimators = Constant("n_estimators", 100)
-            criterion = CategoricalHyperparameter("criterion",
-                                                  ["mse", "friedman_mse"])
+
+            if sklearn.__version__ < "1.0.2":
+                criterion = CategoricalHyperparameter(
+                    "criterion", ["mse", "mae"], default_value="mse")
+            elif "1.0.2" <= sklearn.__version__ < "1.2.2":
+                criterion = CategoricalHyperparameter(
+                    "criterion", ["squared_error", "absolute_error"], default_value="squared_error")
+            elif '1.2.2' <= sklearn.__version__ <= '1.3.2':
+                if y_neg_mask:
+                    criterion = CategoricalHyperparameter(
+                        "criterion", ["squared_error", "absolute_error", "friedman_mse", "poisson"], default_value="squared_error")
+                else:
+                    criterion = CategoricalHyperparameter(
+                        "criterion", ["squared_error", "absolute_error", "friedman_mse"], default_value="squared_error")
+            else:
+                raise ValueError("scikit-learn version %s is not supported." % sklearn.__version__)
+
             max_features = UniformFloatHyperparameter(
                 "max_features", 0.1, 1.0, default_value=1.0, q=0.05)
 

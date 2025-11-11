@@ -1,3 +1,5 @@
+import sklearn
+from packaging.version import parse as V
 from ConfigSpace.configuration_space import ConfigurationSpace
 from ConfigSpace.hyperparameters import UniformFloatHyperparameter, \
     UniformIntegerHyperparameter, CategoricalHyperparameter, \
@@ -18,6 +20,7 @@ class RandomForest(
                  min_weight_fraction_leaf, bootstrap, max_leaf_nodes,
                  min_impurity_decrease, random_state=None, n_jobs=1,
                  class_weight=None):
+        BaseClassificationModel.__init__(self)
         self.n_estimators = self.get_max_iter()
         self.criterion = criterion
         self.max_features = max_features
@@ -40,7 +43,7 @@ class RandomForest(
     def get_current_iter(self):
         return self.estimator.n_estimators
 
-    def iterative_fit(self, X, y, sample_weight=None, n_iter=1, refit=False):
+    def iterative_fit(self, X, Y, sample_weight=None, n_iter=1, refit=False):
         from sklearn.ensemble import RandomForestClassifier
 
         if refit:
@@ -92,7 +95,7 @@ class RandomForest(
             self.estimator.n_estimators = min(self.estimator.n_estimators,
                                               self.n_estimators)
 
-        self.estimator.fit(X, y, sample_weight=sample_weight)
+        self.estimator.fit(X, Y, sample_weight=sample_weight)
         return self
 
     def configuration_fully_fitted(self):
@@ -127,10 +130,18 @@ class RandomForest(
                 'output': (PREDICTIONS,)}
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         cs = ConfigurationSpace()
-        criterion = CategoricalHyperparameter(
-            "criterion", ["gini", "entropy"], default_value="gini")
+
+        SKLEARN_VERSION = V(sklearn.__version__)
+        if SKLEARN_VERSION < V("1.1.3"):
+            criterion = CategoricalHyperparameter(
+                "criterion", ["gini", "entropy"], default_value="gini")
+        elif SKLEARN_VERSION <= V("1.8"):
+            criterion = CategoricalHyperparameter(
+                "criterion", ["gini", "entropy", "log_loss"], default_value="gini")
+        else:
+            raise RuntimeError("Unsupported sklearn version: {}".format(sklearn.__version__))
 
         # The maximum number of features used in the forest is calculated as m^max_features, where
         # m is the total number of features, and max_features is the hyperparameter specified below.

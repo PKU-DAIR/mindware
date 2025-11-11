@@ -6,27 +6,33 @@ import pickle as pkl
 from mindware.components.utils.constants import CLS_TASKS
 from mindware.components.ensemble.base_ensemble import BaseEnsembleModel
 from mindware.components.feature_engineering.parse import construct_node
+
+from mindware.components.utils.topk_saver import CombinedTopKModelSaver
+from mindware.modules.base_evaluator import fetch_predict_results
 from functools import reduce
 
 
 class Bagging(BaseEnsembleModel):
-    def __init__(self, stats, data_node,
+    def __init__(self, stats,
                  ensemble_size: int,
-                 task_type: int,
-                 metric: _BaseScorer,
-                 output_dir=None):
-        super().__init__(stats=stats,
-                         data_node=data_node,
+                 task_type: int, if_imbal: bool,
+                 metric: _BaseScorer, resampling_params = None,
+                 output_dir=None, seed=None,
+                 predictions=None, base_model_mask=None):
+        super().__init__(stats,
                          ensemble_method='bagging',
                          ensemble_size=ensemble_size,
-                         task_type=task_type,
-                         metric=metric,
-                         output_dir=output_dir)
+                         task_type=task_type, if_imbal=if_imbal,
+                         metric=metric, resampling_params=resampling_params,
+                         output_dir=output_dir, seed=seed,
+                         predictions=predictions)
 
-    def fit(self, datanode):
+        self.base_model_mask = base_model_mask
+
+    def fit(self):
         return self
 
-    def predict(self, data):
+    def predict(self, data, refit='full'):
         model_pred_list = []
         final_pred = []
         # Get predictions from each model
@@ -34,17 +40,11 @@ class Bagging(BaseEnsembleModel):
         for algo_id in self.stats:
             model_to_eval = self.stats[algo_id]
             for idx, (_, _, path) in enumerate(model_to_eval):
-                with open(path, 'rb')as f:
-                    op_list, model, _ = pkl.load(f)
-                _node = data.copy_()
-
-                _node = construct_node(_node, op_list)
 
                 if self.base_model_mask[model_cnt] == 1:
-                    if self.task_type in CLS_TASKS:
-                        model_pred_list.append(model.predict_proba(_node.data[0]))
-                    else:
-                        model_pred_list.append(model.predict(_node.data[0]))
+                    path = CombinedTopKModelSaver.get_parse_path(path, mode=refit, **self.resampling_params)
+                    op_list, model, _ = CombinedTopKModelSaver._load(path)
+                    model_pred_list.append(fetch_predict_results(self.task_type, op_list, model, data))
                 model_cnt += 1
 
         # Calculate the average of predictions
@@ -68,3 +68,5 @@ class Bagging(BaseEnsembleModel):
         ens_info['ensemble_method'] = 'bagging'
         ens_info['config'] = ens_config
         return ens_info
+
+

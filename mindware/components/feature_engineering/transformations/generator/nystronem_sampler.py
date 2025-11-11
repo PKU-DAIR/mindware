@@ -71,7 +71,7 @@ class NystronemSampler(Transformer):
         return _X
 
     @staticmethod
-    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac'):
+    def get_hyperparameter_search_space(dataset_properties=None, optimizer='smac', **kwargs):
         if dataset_properties is not None and \
                 (dataset_properties.get("sparse") is True or
                  dataset_properties.get("signed") is False):
